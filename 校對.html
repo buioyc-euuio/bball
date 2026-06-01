@@ -220,13 +220,25 @@ async function load(){
 }
 
 let imgSpinTimer=null;
+const prefetched=new Set();   // 已預抓過的圖, 不重抓
+// 趁看當前這張時, 背景把後面 N 張的圖先抓進瀏覽器快取 → 按「下一張」時秒出。
+function prefetchAhead(n=3){
+ for(let k=1;k<=n;k++){
+   const d=DRAFTS[cur+k];
+   if(!d||!d.img||prefetched.has(d.img))continue;
+   prefetched.add(d.img);
+   new Image().src=d.img;   // 觸發 GET, 瀏覽器依快取標頭存起來
+ }
+}
 // 切換分頁時換圖: 圖載入超過 150ms 才顯示轉圈(已快取的圖瞬間出現, 不閃動), 載完即隱藏。
 function showSheetImg(src){
  const img=document.getElementById('sheetImg'), sp=document.getElementById('imgSpin');
  clearTimeout(imgSpinTimer);
- if(img.getAttribute('src')===src){sp.classList.remove('show');return;}
+ const done=()=>{clearTimeout(imgSpinTimer);sp.classList.remove('show');
+   setTimeout(()=>prefetchAhead(3),200);};   // 當前圖到位後再背景預抓, 不搶頻寬
+ if(img.getAttribute('src')===src){sp.classList.remove('show');done();return;}
  imgSpinTimer=setTimeout(()=>sp.classList.add('show'),150);
- img.onload=img.onerror=()=>{clearTimeout(imgSpinTimer);sp.classList.remove('show');};
+ img.onload=img.onerror=done;
  img.src=src;
 }
 function render(){
