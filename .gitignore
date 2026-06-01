@@ -1,8 +1,13 @@
-# 資料正本與備份 — 不上傳 git (含個資/掃描檔)
+# 資料正本與備份 — 不上傳 git (含個資/掃描檔/學生照片)
 bball.db
 backups/
 cuts/
+pages/
 *.pdf
+*.HEIC
+*.heic
+*.xlsx
 __pycache__/
 *.pyc
 .DS_Store
+.venv/
