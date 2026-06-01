@@ -4,6 +4,7 @@ services:
   - type: web
     name: bball
     runtime: python
+    region: singapore     # 與 Neon (ap-southeast-1 新加坡) 同區, DB 往返才不會繞地球半圈
     plan: free            # 免費方案閒置會休眠; 要不休眠改成 starter ($7/月)
     buildCommand: pip install -r requirements.txt
     startCommand: python3 server.py

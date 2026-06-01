@@ -5,7 +5,7 @@
 啟動: python3 server.py  (或雙擊 start.command)
 資料永遠住在 bball.db, 與前端 HTML 完全脫鉤; 換前端不會掉資料。
 """
-import os, re, json, sqlite3, base64, webbrowser, threading, time, base64 as _b64
+import os, re, json, sqlite3, base64, webbrowser, threading, time, hashlib, contextlib, base64 as _b64
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, unquote
 
@@ -30,12 +30,37 @@ STAT_KEYS = ["pts", "foul", "tfoul", "ast", "oreb", "dreb", "stl"]
 
 # ---------------------------------------------------------------- DB layer
 def conn():
+    """單次連線(給一次性腳本: migrate/import/build 用)。伺服器熱路徑請改用 db()。"""
     if PG:
         return psycopg.connect(DATABASE_URL, row_factory=dict_row)
     c = sqlite3.connect(DB)
     c.row_factory = sqlite3.Row
     c.execute("PRAGMA foreign_keys=ON")
     return c
+
+# 雲端模式: 用連線池, 避免每個 HTTP request 都重新撥接遠端 Neon(這是「點一下很慢」的主因)。
+_pool = None
+def _get_pool():
+    global _pool
+    if _pool is None:
+        from psycopg_pool import ConnectionPool
+        _pool = ConnectionPool(DATABASE_URL, min_size=1, max_size=4,
+                               kwargs={"row_factory": dict_row}, open=False)
+        _pool.open()
+    return _pool
+
+@contextlib.contextmanager
+def db():
+    """伺服器熱路徑統一入口: PG 走連線池(重複使用連線), 本地走單次 SQLite 連線。"""
+    if PG:
+        with _get_pool().connection() as c:
+            yield c
+    else:
+        c = conn()
+        try:
+            yield c
+        finally:
+            c.close()
 
 def q(sql):
     """SQLite 用 ?, Postgres 用 %s。其餘 SQL 兩邊通用。"""
@@ -216,8 +241,7 @@ def upsert_sheet(c, s, confirmed=None, autototal=False):
 def now():
     return time.strftime("%Y-%m-%d %H:%M:%S")
 
-def sheet_to_dict(c, g):
-    lines = c.execute(q("SELECT * FROM stat_lines WHERE game_id=? ORDER BY col"), (g["id"],)).fetchall()
+def sheet_to_dict(g, lines):
     players = []
     for ln in lines:
         marks = json.loads(ln["marks"] or "{}")
@@ -246,40 +270,48 @@ def sheet_to_dict(c, g):
     }
 
 def get_sheets():
-    c = conn()
-    gs = c.execute("SELECT * FROM games ORDER BY page, idx_on_page, id").fetchall()
-    out = [sheet_to_dict(c, g) for g in gs]
-    c.close()
-    return out
+    with db() as c:
+        gs = c.execute("SELECT * FROM games ORDER BY page, idx_on_page, id").fetchall()
+        all_lines = c.execute("SELECT * FROM stat_lines ORDER BY game_id, col").fetchall()
+    by_game = {}
+    for ln in all_lines:
+        by_game.setdefault(ln["game_id"], []).append(ln)
+    return [sheet_to_dict(g, by_game.get(g["id"], [])) for g in gs]
 
 def get_roster():
-    c = conn()
-    r = [row["name"] for row in c.execute("SELECT name FROM players ORDER BY ord")]
-    c.close()
-    return r
+    with db() as c:
+        return [row["name"] for row in c.execute("SELECT name FROM players ORDER BY ord")]
 
 def get_img(sid):
-    c = conn()
-    row = c.execute(q("SELECT img FROM games WHERE sid=?"), (sid,)).fetchone()
-    c.close()
+    """回傳 (mime, blob, etag)。etag 供瀏覽器快取比對(304)。"""
+    with db() as c:
+        row = c.execute(q("SELECT img FROM games WHERE sid=?"), (sid,)).fetchone()
     if not row or not row["img"]:
-        return None, None
+        return None, None, None
     uri = row["img"]
     m = re.match(r"data:([^;,]+)[^,]*,(.*)", uri, re.S)
     if not m:
-        return None, None
+        return None, None, None
     mime, b64 = m.group(1), m.group(2)
     try:
-        return mime, base64.b64decode(b64)
+        blob = base64.b64decode(b64)
     except Exception:
-        return None, None
+        return None, None, None
+    etag = '"' + hashlib.md5(b64.encode("ascii", "ignore")).hexdigest()[:16] + '"'
+    return mime, blob, etag
 
 def compute_summary():
     """回傳 14 欄統計總表 (僅計 confirmed=1 的場次)。"""
-    c = conn()
-    roster = [row["name"] for row in c.execute("SELECT name FROM players ORDER BY ord")]
+    with db() as c:
+        roster = [row["name"] for row in c.execute("SELECT name FROM players ORDER BY ord")]
+        games = c.execute("SELECT * FROM games WHERE confirmed=1").fetchall()
+        gids = {g["id"] for g in games}
+        all_lines = c.execute("SELECT * FROM stat_lines").fetchall()
     order = {n: i for i, n in enumerate(roster)}
-    games = c.execute("SELECT * FROM games WHERE confirmed=1").fetchall()
+    by_game = {}
+    for ln in all_lines:
+        if ln["game_id"] in gids:
+            by_game.setdefault(ln["game_id"], []).append(ln)
     agg = {}
     def slot(name):
         if name not in agg:
@@ -287,7 +319,7 @@ def compute_summary():
                              dreb=0, oreb=0, foul=0, ref_main=0, ref_asst=0, ref_scorer=0)
         return agg[name]
     for g in games:
-        lines = c.execute(q("SELECT * FROM stat_lines WHERE game_id=?"), (g["id"],)).fetchall()
+        lines = by_game.get(g["id"], [])
         ta, tb = g["total_a"], g["total_b"]
         if ta is None and tb is None:  # 後備: 由個人得分加總
             ta = sum(ln["points"] or 0 for ln in lines if ln["team"] == "A")
@@ -314,7 +346,6 @@ def compute_summary():
             nm = (g[col] or "").strip()
             if nm:
                 slot(nm)[key] += 1
-    c.close()
     names = list(roster) + [n for n in agg if n not in order]
     rows = []
     for i, nm in enumerate(names, start=1):
@@ -354,7 +385,7 @@ class H(BaseHTTPRequestHandler):
         self.end_headers()
         return False
 
-    def _send(self, code, body, ctype="application/json; charset=utf-8"):
+    def _send(self, code, body, ctype="application/json; charset=utf-8", headers=None):
         if isinstance(body, (dict, list)):
             body = json.dumps(body, ensure_ascii=False).encode("utf-8")
         elif isinstance(body, str):
@@ -362,7 +393,11 @@ class H(BaseHTTPRequestHandler):
         self.send_response(code)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-store")
+        if headers:
+            for k, v in headers.items():
+                self.send_header(k, v)
+        else:
+            self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(body)
 
@@ -398,10 +433,21 @@ class H(BaseHTTPRequestHandler):
             return self._send(200, {"roster": get_roster(), "sheets": get_sheets()})
         if p.startswith("/img/"):
             sid = unquote(p[len("/img/"):])
-            mime, blob = get_img(sid)
+            mime, blob, etag = get_img(sid)
             if blob is None:
                 return self._send(404, {"error": "no image"})
-            return self._send(200, blob, mime)
+            # 圖片可長快取(每場圖固定不變), 重訪分頁就不再重新下載 → 載入瞬間完成。
+            if etag and self.headers.get("If-None-Match", "") == etag:
+                self.send_response(304)
+                self.send_header("ETag", etag)
+                self.send_header("Cache-Control", "public, max-age=86400")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            return self._send(200, blob, mime, headers={
+                "Cache-Control": "public, max-age=86400",
+                "ETag": etag or "",
+            })
         return self._send(404, {"error": "not found"})
 
     def do_POST(self):
@@ -416,12 +462,9 @@ class H(BaseHTTPRequestHandler):
             return self._send(400, {"error": "bad json"})
         if p in ("/api/save", "/api/confirm"):
             confirmed = 1 if p == "/api/confirm" else None
-            c = conn()
-            try:
+            with db() as c:
                 upsert_sheet(c, body, confirmed=confirmed)
                 c.commit()
-            finally:
-                c.close()
             return self._send(200, {"ok": True, "sid": body.get("sid"), "confirmed": bool(confirmed)})
         return self._send(404, {"error": "not found"})
 
@@ -446,6 +489,9 @@ def main():
         srv.serve_forever()
     except KeyboardInterrupt:
         print("\n已關閉。")
+    finally:
+        if _pool is not None:
+            _pool.close()
 
 
 if __name__ == "__main__":

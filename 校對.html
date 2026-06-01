@@ -60,14 +60,24 @@ input,select{font-family:inherit;font-size:14px;padding:6px 7px;border:1px solid
 .chip.done{background:var(--mk);border-color:var(--mkb);color:var(--ok)}
 .chip.cur{outline:2px solid var(--brand);outline-offset:-2px;color:var(--ink)}
 .flash{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#1f2733;color:#fff;padding:9px 18px;border-radius:22px;opacity:0;transition:.3s;pointer-events:none;z-index:9}.flash.show{opacity:.95}
+/* 載入中動畫 */
+.spin{width:40px;height:40px;border:4px solid rgba(214,83,43,.18);border-top-color:var(--brand);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#loadOverlay{position:fixed;inset:0;background:rgba(244,246,248,.72);backdrop-filter:blur(2px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:50}
+#loadOverlay .txt{font-size:13.5px;color:var(--muted);font-weight:600}
+#loadOverlay.hide{display:none}
+#imgSpin{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:6;display:none;pointer-events:none}
+#imgSpin.show{display:block}
 @media(max-width:1000px){.wrap{flex-direction:column}.col.left{flex:auto}.imgbox{position:static;max-height:none}}
 </style></head><body>
+<div id="loadOverlay"><div class="spin"></div><div class="txt">載入中…</div></div>
 <header><h1>📷 閃卡校對 ‧ 攻守紀錄辨識</h1>
 <span class="save-dot" id="saveDot">連線中…</span>
 <a href="/summary">📊 統計總表</a>
 <span class="prog" id="prog"></span></header>
 <div class="wrap">
  <div class="col left"><div class="imgbox" id="imgbox" onclick="toggleZoom()">
+   <div id="imgSpin"><div class="spin"></div></div>
    <img id="sheetImg" src="">
    <div class="hint">點圖片放大 / 縮小 ‧ 與右表逐格對照</div>
  </div></div>
@@ -168,7 +178,7 @@ async function verifySaved(d){
 async function saveNow(){readTop();const d=DRAFTS[cur];setSync('busy','儲存到後端中…');
  try{await fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload(d))});}
  catch(e){setSync('bad','⚠️ 儲存失敗，請確認服務還在執行');return;}
- setDot('已儲存 ✓');await verifySaved(d);}
+ savedSnap=canon(d);setDot('已儲存 ✓');await verifySaved(d);}
 async function reloadFromBackend(){
  if(!confirm('將以後端 bball.db 的內容覆蓋目前畫面，放棄此張尚未儲存的修改。確定？'))return;
  setSync('busy','從後端重新載入中…');
@@ -178,7 +188,7 @@ async function reloadFromBackend(){
    setSync('ok','↻ 已從後端重新載入（畫面 = 後端資料）');}
  catch(e){setSync('bad','⚠️ 無法連線後端');}
 }
-let saveTimer=null, savingSid=null;
+let saveTimer=null, savingSid=null, savedSnap='';
 function setDot(t){document.getElementById('saveDot').textContent=t;}
 function scheduleSave(){
   setDot('儲存中…');
@@ -187,11 +197,16 @@ function scheduleSave(){
   saveTimer=setTimeout(()=>doSave(d),350);
 }
 async function doSave(d){
+  // 沒有任何變動就不送出(切換分頁不必每次都打後端, 點擊才會順)。
+  const snap=canon(d);
+  if(snap===savedSnap){setDot('已自動儲存 ✓');return;}
   try{
     await fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload(d))});
+    savedSnap=snap;
     setDot('已自動儲存 ✓');
   }catch(e){setDot('⚠️ 儲存失敗，請確認服務還在執行');}
 }
+function hideOverlay(){document.getElementById('loadOverlay').classList.add('hide');}
 async function load(){
   try{
     const r=await fetch('/api/sheets');const j=await r.json();
@@ -201,12 +216,24 @@ async function load(){
     setDot('已連線 ✓');
     render();
   }catch(e){setDot('⚠️ 無法連線到本地服務');document.body.insertAdjacentHTML('afterbegin','<div style="background:#ffe0dd;color:#a3271b;padding:14px;text-align:center">無法連到本地服務，請確認 server.py 正在執行(雙擊 start.command)。</div>');}
+  finally{hideOverlay();}
 }
 
+let imgSpinTimer=null;
+// 切換分頁時換圖: 圖載入超過 150ms 才顯示轉圈(已快取的圖瞬間出現, 不閃動), 載完即隱藏。
+function showSheetImg(src){
+ const img=document.getElementById('sheetImg'), sp=document.getElementById('imgSpin');
+ clearTimeout(imgSpinTimer);
+ if(img.getAttribute('src')===src){sp.classList.remove('show');return;}
+ imgSpinTimer=setTimeout(()=>sp.classList.add('show'),150);
+ img.onload=img.onerror=()=>{clearTimeout(imgSpinTimer);sp.classList.remove('show');};
+ img.src=src;
+}
 function render(){
  if(!DRAFTS.length)return;
  const d=DRAFTS[cur];
- document.getElementById('sheetImg').src=d.img;
+ savedSnap=canon(d);   // 進入此張時的後端基準, 之後沒改就不重送
+ showSheetImg(d.img);
  document.getElementById('idx').textContent=(cur+1)+' / '+DRAFTS.length;
  document.getElementById('doneTag').innerHTML=d.done?'<span class="done-badge">✓ 已確認完全正確</span>':'<span class="pend-badge">尚未確認</span>';
  document.getElementById('note').textContent=d.note||'';
@@ -262,7 +289,7 @@ async function go(dir){readTop();await doSave(DRAFTS[cur]);cur=(cur+dir+DRAFTS.l
 async function confirmCard(){readTop();const d=DRAFTS[cur];d.done=true;setSync('busy','確認並儲存到後端中…');
  try{await fetch('/api/confirm',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload(d))});}
  catch(e){d.done=false;setDot('⚠️ 儲存失敗');setSync('bad','⚠️ 儲存失敗，請確認服務還在執行');return;}
- setDot('已儲存 ✓');flash('已確認第 '+(cur+1)+' 張');render();await verifySaved(d);}
+ savedSnap=canon(d);setDot('已儲存 ✓');flash('已確認第 '+(cur+1)+' 張');render();await verifySaved(d);}
 function toggleZoom(){document.getElementById('imgbox').classList.toggle('zoom')}
 load();
 </script></body></html>
