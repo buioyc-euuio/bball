@@ -1,0 +1,8 @@
+# 資料正本與備份 — 不上傳 git (含個資/掃描檔)
+bball.db
+backups/
+cuts/
+*.pdf
+__pycache__/
+*.pyc
+.DS_Store

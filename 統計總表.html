@@ -1,0 +1,67 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>統計總表 ‧ 攻守紀錄</title>
+<style>
+:root{--bg:#f4f6f8;--card:#fff;--line:#d8dee6;--ink:#1f2733;--muted:#6b7785;--brand:#d6532b;--brandd:#b8431f;--soft:#eef2f6;--ok:#16794a;}
+*{box-sizing:border-box}body{margin:0;font-family:"PingFang TC","Microsoft JhengHei",Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:15px}
+header{background:var(--brand);color:#fff;padding:11px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+header h1{font-size:16px;margin:0}
+header a{color:#fff;font-size:13px;background:rgba(255,255,255,.18);padding:5px 12px;border-radius:20px;text-decoration:none}
+header a:hover{background:rgba(255,255,255,.32)}
+.meta{margin-left:auto;font-size:13px;opacity:.9}
+.wrap{max-width:1200px;margin:0 auto;padding:16px}
+.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.btn{background:var(--brand);color:#fff;border:none;border-radius:8px;padding:9px 15px;font-weight:700;cursor:pointer;font-size:14px;text-decoration:none;display:inline-block}
+.btn:hover{background:var(--brandd)}
+.ghost{background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 13px;cursor:pointer;font-weight:600}
+.ghost:hover{background:var(--soft)}
+.hint{color:var(--muted);font-size:12.5px}
+table{border-collapse:collapse;width:100%;background:var(--card);font-size:13.5px}
+th,td{border:1px solid var(--line);padding:6px 8px;text-align:center}
+th{background:var(--soft);position:sticky;top:0;cursor:pointer;white-space:nowrap}
+th:hover{background:#e3e9f0}
+td.name{text-align:left;font-weight:600;white-space:nowrap}
+tbody tr:nth-child(even){background:#fafbfc}
+tbody tr.empty{color:#aab3bd}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:0;overflow:auto;max-height:78vh}
+</style></head><body>
+<header><h1>📊 統計總表</h1>
+<a href="/">← 回校對</a>
+<span class="meta" id="meta"></span></header>
+<div class="wrap">
+ <div class="bar">
+   <a class="btn" href="/api/summary.csv" download="籃球統計總表.csv">⬇️ 匯出 CSV(可用 Excel 開)</a>
+   <button class="ghost" onclick="window.print()">🖨 列印 / 存 PDF</button>
+   <label class="hint"><input type="checkbox" id="hideEmpty"> 只看有資料的人</label>
+   <span class="hint" id="status"></span>
+ </div>
+ <div class="card"><table id="tbl"></table></div>
+ <p class="hint" style="margin-top:10px">只統計「已確認」的場次。勝/負依該場兩隊總得分比較;裁判三欄各自計次。得分以總得分為準。</p>
+</div>
+<script>
+let COLS=[],ROWS=[],sortKey=null,sortDir=1;
+const NUMERIC=new Set(["序號","完賽場數","勝場次","負場次","總得分","助攻","抄截","防守籃板","進攻籃板","犯規","擔任主裁判","擔任副裁判","擔任紀錄"]);
+function isEmptyRow(r){return COLS.every(c=>c==='序號'||c==='姓名'||!r[c]);}
+async function load(){
+  try{
+    const j=await (await fetch('/api/summary')).json();
+    COLS=j.cols;ROWS=j.rows;
+    const confirmed=ROWS.reduce((m,r)=>m,0);
+    document.getElementById('status').textContent='共 '+ROWS.length+' 位';
+    render();
+  }catch(e){document.getElementById('status').textContent='⚠️ 無法連線到本地服務';}
+}
+function render(){
+  const hide=document.getElementById('hideEmpty').checked;
+  let rows=ROWS.slice();
+  if(sortKey){rows.sort((a,b)=>{let x=a[sortKey],y=b[sortKey];if(NUMERIC.has(sortKey)){x=+x;y=+y;}return x<y?-1*sortDir:x>y?sortDir:0;});}
+  if(hide)rows=rows.filter(r=>!isEmptyRow(r));
+  let h='<thead><tr>'+COLS.map(c=>`<th onclick="sortBy('${c}')">${c}${sortKey===c?(sortDir>0?' ▲':' ▼'):''}</th>`).join('')+'</tr></thead><tbody>';
+  rows.forEach(r=>{h+='<tr class="'+(isEmptyRow(r)?'empty':'')+'">'+COLS.map(c=>`<td class="${c==='姓名'?'name':''}">${r[c]}</td>`).join('')+'</tr>';});
+  h+='</tbody>';
+  document.getElementById('tbl').innerHTML=h;
+}
+function sortBy(c){if(sortKey===c)sortDir*=-1;else{sortKey=c;sortDir=1;}render();}
+document.getElementById('hideEmpty').addEventListener('change',render);
+load();
+</script></body></html>

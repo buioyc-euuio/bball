@@ -1,0 +1,268 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>閃卡校對 ‧ 攻守紀錄辨識</title>
+<style>
+:root{--bg:#f4f6f8;--card:#fff;--line:#d8dee6;--ink:#1f2733;--muted:#6b7785;--brand:#d6532b;--brandd:#b8431f;--A:#2563eb;--B:#16a34a;--soft:#eef2f6;
+--flag:#fff5d1;--flagb:#e8c84b;--mk:#dff5e4;--mkb:#7cc894;--cf:#ffe0dd;--cfb:#e74c3c;--q:#ff8c2e;--ok:#16794a;}
+*{box-sizing:border-box}body{margin:0;font-family:"PingFang TC","Microsoft JhengHei",Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:15px}
+header{background:var(--brand);color:#fff;padding:11px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+header h1{font-size:16px;margin:0}.prog{margin-left:auto;font-size:13.5px;background:rgba(255,255,255,.18);padding:5px 12px;border-radius:20px}
+.save-dot{font-size:12px;opacity:.9}
+header a{color:#fff;font-size:13px;background:rgba(255,255,255,.18);padding:5px 12px;border-radius:20px;text-decoration:none}
+header a:hover{background:rgba(255,255,255,.32)}
+.wrap{display:flex;gap:14px;padding:14px;align-items:flex-start;max-width:1600px;margin:0 auto}
+.col{flex:1;min-width:0}.col.left{flex:0 0 42%}
+.imgbox{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;position:sticky;top:14px;max-height:94vh;overflow:auto}
+.imgbox img{width:100%;border-radius:8px;cursor:zoom-in}.imgbox.zoom img{width:180%;cursor:zoom-out}
+.imgbox .hint{font-size:12px;color:var(--muted);text-align:center;margin-top:6px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+.card h2{margin:0 0 10px;font-size:15.5px}
+.top{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);font-weight:600}
+input,select{font-family:inherit;font-size:14px;padding:6px 7px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink)}
+.sheet{border-collapse:collapse;width:100%;font-size:13px;table-layout:fixed}
+.sheet th,.sheet td{border:1px solid var(--line);padding:2px;text-align:center;position:relative}
+.sheet th{background:var(--soft);font-size:11.5px;padding:5px 2px}
+.sheet th.pa{background:#e7effd;color:var(--A)}.sheet th.pb{background:#e6f6ec;color:var(--B)}
+.sheet td.lab{background:var(--soft);font-weight:700;font-size:11.5px;white-space:nowrap;width:88px;text-align:right;padding-right:6px}
+.sheet input,.sheet select{width:100%;border:none;text-align:center;padding:6px 1px;font-size:13px;border-radius:0;background:transparent}
+.sheet select{font-size:12px}
+.sheet td.cell{padding:0}
+.sheet td.cell.mk{background:var(--mk)} .sheet td.cell.mk input{font-weight:700}
+.sheet td.cell.cf{background:var(--cf);outline:2px solid var(--cfb);outline-offset:-2px}
+.sheet td.cell.flag{background:var(--flag)}
+.qbadge{position:absolute;top:0;right:1px;font-size:10px;color:#fff;background:var(--q);border-radius:50%;width:14px;height:14px;line-height:14px;font-weight:700;cursor:help}
+.cfbadge{position:absolute;top:0;right:1px;font-size:10px;color:#fff;background:var(--cfb);border-radius:3px;padding:0 3px;line-height:14px;font-weight:700;cursor:help}
+.totrow td{background:#fbfaf0;font-weight:800}
+.teamtot{padding:5px 6px!important;text-align:center;vertical-align:middle}
+.teamtot input{width:72px;text-align:center;font-weight:800;font-size:15px;border:1px solid var(--line);border-radius:6px;background:#fff;padding:5px;display:inline-block}
+.tothint{font-size:11px;font-weight:600;margin-top:3px}
+.tothint.ok{color:var(--ok)} .tothint.bad{color:var(--cfb)}
+.teamtot.bad{background:var(--cf);outline:2px solid var(--cfb);outline-offset:-2px}
+.win{color:var(--ok)} .badge{font-size:11px;padding:2px 7px;border-radius:20px;color:#fff;font-weight:700}.badge.A{background:var(--A)}.badge.B{background:var(--B)}
+.refs{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+.note{background:#fff8ef;border:1px solid #f3d9bf;color:#8a5a2b;border-radius:8px;padding:8px 10px;font-size:12.5px;margin-top:10px}
+.legend{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.9}
+.legend .sw{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin:0 3px 0 8px}
+.btn{background:var(--brand);color:#fff;border:none;border-radius:8px;padding:9px 15px;font-weight:700;cursor:pointer;font-size:14px}
+.btn:hover{background:var(--brandd)}.ghost{background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 13px;cursor:pointer;font-weight:600}
+.ghost:hover{background:var(--soft)}.nav{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.btn.save{background:#0f766e}.btn.save:hover{background:#0b5d57}
+.sync{margin-top:10px;font-size:13px;font-weight:600;padding:8px 12px;border-radius:8px;background:var(--soft);color:var(--muted);border:1px solid var(--line)}
+.sync.ok{background:var(--mk);border-color:var(--mkb);color:var(--ok)}
+.sync.bad{background:var(--cf);border-color:var(--cfb);color:#a3271b}
+.sync.busy{background:#fff5d1;border-color:#e8c84b;color:#8a6d1b}
+.done-badge{color:var(--ok);font-weight:700;font-size:13px;background:var(--mk);border:1px solid var(--mkb);padding:2px 9px;border-radius:20px}
+.pend-badge{color:var(--muted);font-weight:600;font-size:13px;background:var(--soft);border:1px solid var(--line);padding:2px 9px;border-radius:20px}
+.sheetnav{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}
+.chip{min-width:30px;padding:5px 9px;border:1px solid var(--line);border-radius:7px;background:#fff;cursor:pointer;font-size:12.5px;font-weight:700;color:var(--muted)}
+.chip:hover{background:var(--soft)}
+.chip.done{background:var(--mk);border-color:var(--mkb);color:var(--ok)}
+.chip.cur{outline:2px solid var(--brand);outline-offset:-2px;color:var(--ink)}
+.flash{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#1f2733;color:#fff;padding:9px 18px;border-radius:22px;opacity:0;transition:.3s;pointer-events:none;z-index:9}.flash.show{opacity:.95}
+@media(max-width:1000px){.wrap{flex-direction:column}.col.left{flex:auto}.imgbox{position:static;max-height:none}}
+</style></head><body>
+<header><h1>📷 閃卡校對 ‧ 攻守紀錄辨識</h1>
+<span class="save-dot" id="saveDot">連線中…</span>
+<a href="/summary">📊 統計總表</a>
+<span class="prog" id="prog"></span></header>
+<div class="wrap">
+ <div class="col left"><div class="imgbox" id="imgbox" onclick="toggleZoom()">
+   <img id="sheetImg" src="">
+   <div class="hint">點圖片放大 / 縮小 ‧ 與右表逐格對照</div>
+ </div></div>
+ <div class="col">
+   <div class="card" style="padding:11px 14px">
+     <h2 style="margin-bottom:7px">📋 校對進度總覽 <span id="navsummary" style="font-size:12.5px;color:var(--muted);font-weight:400"></span></h2>
+     <div class="sheetnav" id="sheetnav"></div>
+     <div style="font-size:11.5px;color:var(--muted);margin-top:7px">綠色 ✓ ＝你已確認完全正確；灰色 ＝尚未確認。點任一格可跳到該張。</div>
+   </div>
+   <div class="card">
+     <h2>第 <span id="idx"></span> 張 <span id="doneTag"></span></h2>
+     <div class="top">
+       <label class="f">場次<input type="number" id="f_no" style="width:80px"></label>
+       <label class="f">場地<input type="text" id="f_venue" style="width:64px"></label>
+       <label class="f">日期(可空)<input type="date" id="f_date"></label>
+     </div>
+     <table class="sheet" id="sheet"></table>
+     <div class="refs">
+       <label class="f">主裁判<input id="f_main" list="roster" placeholder="輸入或選擇" autocomplete="off" style="width:120px"></label>
+       <label class="f">副裁判<input id="f_asst" list="roster" placeholder="輸入或選擇" autocomplete="off" style="width:120px"></label>
+       <label class="f">紀錄<input id="f_scorer" list="roster" placeholder="輸入或選擇" autocomplete="off" style="width:120px"></label>
+     </div>
+     <div class="note" id="note"></div>
+     <div class="legend">
+       <span class="sw" style="background:var(--flag);border:1px solid var(--flagb)"></span>黃=我沒把握、請確認
+       <span class="sw" style="background:var(--mk);border:1px solid var(--mkb)"></span>綠=此格紙上有劃記
+       <span class="sw" style="background:var(--cf);border:1px solid var(--cfb)"></span>紅=總得分與三人得分加總不一致。改過的格子標記自動消失。
+     </div>
+     <div class="nav">
+       <button class="ghost" onclick="go(-1)">← 上一張</button>
+       <button class="btn save" onclick="saveNow()">💾 儲存到後端</button>
+       <button class="btn" onclick="confirmCard()">✓ 確認完全正確</button>
+       <button class="ghost" onclick="reloadFromBackend()">↻ 從後端重新載入</button>
+       <button class="ghost" onclick="go(1)">下一張 →</button>
+     </div>
+     <div class="sync" id="syncStatus">尚未儲存</div>
+   </div>
+   <div class="card">
+     <h2>資料保存</h2>
+     <p style="font-size:12.5px;color:var(--muted);margin:0 0 10px">資料永遠住在本機資料庫 <b>bball.db</b>，與 HTML 完全脫鉤；按「儲存到後端」或「確認」即寫入，並會自動回讀後端比對是否一致。每次啟動服務也會自動備份到 <b>backups/</b> 資料夾。</p>
+     <button class="ghost" onclick="location.href='/api/export'">⬇️ 下載完整資料備份(JSON)</button>
+     <span id="cnt" style="margin-left:10px;color:var(--muted);font-size:12.5px"></span>
+   </div>
+ </div>
+</div>
+<div class="flash" id="flash"></div>
+<datalist id="roster"></datalist>
+<script>
+let ROSTER=[], DRAFTS=[], cur=0;
+const STAT_KEYS=['pts','foul','tfoul','ast','oreb','dreb','stl'];
+const ROWS=[['group','組別','text'],['name','姓名','name'],['pts','得分(正字筆數)','stat'],['foul','犯規','stat'],['tfoul','團犯','stat'],['ast','助攻','stat'],['oreb','進攻籃板','stat'],['dreb','防守籃板','stat'],['stl','抄截','stat']];
+function esc(s){return(s+'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function flash(m){const f=document.getElementById('flash');f.textContent=m;f.classList.add('show');setTimeout(()=>f.classList.remove('show'),1400)}
+function num(x){return x===''||x==null?null:Number(x)}
+function teamSumPts(t){return DRAFTS[cur].players.filter(p=>p.team===t).reduce((s,p)=>s+(num(p.stats.pts.v)||0),0);}
+function updTeamConsistency(){
+ const d=DRAFTS[cur];if(!d)return;
+ ['A','B'].forEach(t=>{
+   const sum=teamSumPts(t),tot=num(d['total'+t]);
+   const cell=document.getElementById('totcell'+t),hint=document.getElementById('hint'+t);
+   if(!cell||!hint)return;
+   if(tot==null){hint.className='tothint';hint.textContent='三人加總 '+sum+'（總得分未填）';cell.classList.remove('bad');}
+   else if(tot===sum){hint.className='tothint ok';hint.textContent='✓ 與三人加總一致（'+sum+'）';cell.classList.remove('bad');}
+   else{hint.className='tothint bad';hint.textContent='⚠ 三人加總為 '+sum+'，與總得分不符';cell.classList.add('bad');}
+ });
+ const a=num(d.totalA),b=num(d.totalB);
+ const wa=document.getElementById('winA'),wb=document.getElementById('winB');
+ if(wa)wa.innerHTML=(a!=null&&b!=null&&a>b)?'<span class="win">🏆勝</span>':'';
+ if(wb)wb.innerHTML=(a!=null&&b!=null&&b>a)?'<span class="win">🏆勝</span>':'';
+}
+function onTeamTotal(team,el){const v=el.value;DRAFTS[cur]['total'+team]=v===''?'':Number(v);updTeamConsistency();scheduleSave();}
+
+// ---- 後端同步 ----
+function payload(d){const o=JSON.parse(JSON.stringify(d));delete o.img;return o;}
+function setSync(cls,msg){const e=document.getElementById('syncStatus');if(!e)return;e.className='sync '+cls;e.textContent=msg;}
+// 把一張資料整理成可比對的字串(只比有意義的欄位, 不含圖片/旗標)
+function canon(d){
+ const sv=v=>(v===''||v==null)?'':String(Number(v));
+ const pv=p=>STAT_KEYS.map(k=>sv((p.stats[k]||{}).v)).join(',');
+ const players=(d.players||[]).map(p=>[p.team,(p.name||'').trim(),(p.group||'').trim(),pv(p)].join('|')).join(';');
+ return JSON.stringify({no:String(d.no==null?'':d.no).trim(),venue:(d.venue||'').trim(),date:d.date||'',
+   rm:(d.refMain||'').trim(),ra:(d.refAsst||'').trim(),rs:(d.refScorer||'').trim(),
+   ta:sv(d.totalA),tb:sv(d.totalB),note:d.note||'',done:!!d.done,players});
+}
+function fillStats(list){list.forEach(d=>d.players.forEach(p=>{p.stats=p.stats||{};STAT_KEYS.forEach(k=>{if(!p.stats[k])p.stats[k]={v:'',m:false};});}));}
+// 存檔後立刻回讀後端比對前後端是否一致
+async function verifySaved(d){
+ try{
+   const j=await (await fetch('/api/sheets')).json();
+   const b=j.sheets.find(x=>x.sid===d.sid);
+   if(!b){setSync('bad','⚠️ 後端找不到這張('+d.sid+')，請再按一次儲存');return false;}
+   fillStats([b]);
+   const t=new Date().toLocaleTimeString('zh-TW',{hour12:false});
+   if(canon(d)===canon(b)){setSync('ok','✅ 已儲存到後端，前後端資料一致（'+t+'）');return true;}
+   setSync('bad','⚠️ 已送出，但前後端比對不一致，請按「↻ 從後端重新載入」再確認');return false;
+ }catch(e){setSync('bad','⚠️ 無法連線後端，資料可能未儲存，請確認服務還在執行');return false;}
+}
+async function saveNow(){readTop();const d=DRAFTS[cur];setSync('busy','儲存到後端中…');
+ try{await fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload(d))});}
+ catch(e){setSync('bad','⚠️ 儲存失敗，請確認服務還在執行');return;}
+ setDot('已儲存 ✓');await verifySaved(d);}
+async function reloadFromBackend(){
+ if(!confirm('將以後端 bball.db 的內容覆蓋目前畫面，放棄此張尚未儲存的修改。確定？'))return;
+ setSync('busy','從後端重新載入中…');
+ const sid=DRAFTS[cur]&&DRAFTS[cur].sid;
+ try{const j=await (await fetch('/api/sheets')).json();ROSTER=j.roster;DRAFTS=j.sheets;fillStats(DRAFTS);
+   const idx=DRAFTS.findIndex(x=>x.sid===sid);if(idx>=0)cur=idx;render();
+   setSync('ok','↻ 已從後端重新載入（畫面 = 後端資料）');}
+ catch(e){setSync('bad','⚠️ 無法連線後端');}
+}
+let saveTimer=null, savingSid=null;
+function setDot(t){document.getElementById('saveDot').textContent=t;}
+function scheduleSave(){
+  setDot('儲存中…');
+  clearTimeout(saveTimer);
+  const d=DRAFTS[cur];
+  saveTimer=setTimeout(()=>doSave(d),350);
+}
+async function doSave(d){
+  try{
+    await fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload(d))});
+    setDot('已自動儲存 ✓');
+  }catch(e){setDot('⚠️ 儲存失敗，請確認服務還在執行');}
+}
+async function load(){
+  try{
+    const r=await fetch('/api/sheets');const j=await r.json();
+    ROSTER=j.roster; DRAFTS=j.sheets;
+    document.getElementById('roster').innerHTML=ROSTER.map(n=>'<option value="'+esc(n)+'"></option>').join('');
+    fillStats(DRAFTS);
+    setDot('已連線 ✓');
+    render();
+  }catch(e){setDot('⚠️ 無法連線到本地服務');document.body.insertAdjacentHTML('afterbegin','<div style="background:#ffe0dd;color:#a3271b;padding:14px;text-align:center">無法連到本地服務，請確認 server.py 正在執行(雙擊 start.command)。</div>');}
+}
+
+function render(){
+ if(!DRAFTS.length)return;
+ const d=DRAFTS[cur];
+ document.getElementById('sheetImg').src=d.img;
+ document.getElementById('idx').textContent=(cur+1)+' / '+DRAFTS.length;
+ document.getElementById('doneTag').innerHTML=d.done?'<span class="done-badge">✓ 已確認完全正確</span>':'<span class="pend-badge">尚未確認</span>';
+ document.getElementById('note').textContent=d.note||'';
+ const fno=document.getElementById('f_no');fno.value=d.no;fno.parentElement.style.background=d.fno?'var(--flag)':'';
+ document.getElementById('f_venue').value=d.venue; document.getElementById('f_date').value=d.date||'';
+ const refset=(id,val,fl)=>{const e=document.getElementById(id);e.value=val||'';e.parentElement.style.background=fl?'var(--flag)':'';};
+ refset('f_main',d.refMain,d.fmain);refset('f_asst',d.refAsst,d.fasst);refset('f_scorer',d.refScorer,d.fscorer);
+ const P=d.players; let h='<thead><tr><th>項目</th>';
+ P.forEach((p,i)=>h+=`<th class="${p.team==='A'?'pa':'pb'}">${['①','②','③','④','⑤','⑥'][i]||i+1}<br>${p.team}隊</th>`);
+ h+='</tr></thead><tbody>';
+ ROWS.forEach(([k,lab,type])=>{
+   h+=`<tr><td class="lab">${lab}</td>`;
+   P.forEach((p,i)=>{
+     if(type==='name'){h+=`<td class="cell ${p.fname?'flag':''}"><input class="cmb" list="roster" autocomplete="off" data-i="${i}" data-row="name" value="${esc(p.name)}" oninput="onChange(this)" placeholder="輸入或選擇"></td>`;}
+     else if(type==='text'){h+=`<td class="cell"><input data-i="${i}" data-row="group" value="${esc(p.group||'')}" oninput="onChange(this)"></td>`;}
+     else{const c=p.stats[k]||{v:'',m:false};const q=k==='pts'&&p.maybe3;
+       h+=`<td class="cell ${c.m?'mk':''}"><input type="number" min="0" data-i="${i}" data-row="${k}" value="${c.v===''||c.v==null?'':c.v}" oninput="onChange(this)">${q?'<span class=\"qbadge\" title=\"可能三分球/不確定\">?</span>':''}</td>`;}
+   });
+   h+='</tr>';
+ });
+ const tA=d.totalA,tB=d.totalB;
+ h+=`<tr class="totrow"><td class="lab">總得分</td>`+
+    `<td class="cell teamtot" colspan="3" id="totcellA"><span class="badge A">A</span> <input type="number" min="0" id="teamTotalA" value="${tA===''||tA==null?'':tA}" oninput="onTeamTotal('A',this)"> <span id="winA"></span><div class="tothint" id="hintA"></div></td>`+
+    `<td class="cell teamtot" colspan="3" id="totcellB"><span class="badge B">B</span> <input type="number" min="0" id="teamTotalB" value="${tB===''||tB==null?'':tB}" oninput="onTeamTotal('B',this)"> <span id="winB"></span><div class="tothint" id="hintB"></div></td></tr>`;
+ h+='</tbody>';
+ document.getElementById('sheet').innerHTML=h;
+ updTeamConsistency();
+ document.getElementById('prog').textContent='進度 '+DRAFTS.filter(x=>x.done).length+' / '+DRAFTS.length+' 已確認';
+ document.getElementById('cnt').textContent='已確認 '+DRAFTS.filter(x=>x.done).length+' 場';
+ document.getElementById('imgbox').classList.remove('zoom');
+ renderNav();
+ setSync('', d.done?'此張已標記「完全正確」。如需修改，編輯後再按「💾 儲存到後端」。':'尚未儲存到後端。編輯後按「💾 儲存到後端」或「✓ 確認完全正確」即寫入。');
+}
+function renderNav(){
+ const done=DRAFTS.filter(x=>x.done).length;
+ document.getElementById('navsummary').textContent='（已確認完全正確 '+done+' / '+DRAFTS.length+' 張）';
+ document.getElementById('sheetnav').innerHTML=DRAFTS.map((d,i)=>
+   `<button class="chip ${d.done?'done':''} ${i===cur?'cur':''}" onclick="gotoSheet(${i})" title="${esc(d.sid||'')}${d.done?' ‧ 已確認完全正確':' ‧ 尚未確認'}">${d.done?'✓ ':''}${i+1}</button>`).join('');
+}
+async function gotoSheet(i){if(i===cur)return;readTop();await doSave(DRAFTS[cur]);cur=i;render();}
+function onChange(el){
+ const d=DRAFTS[cur],i=+el.dataset.i,row=el.dataset.row,p=d.players[i],td=el.closest('td');
+ if(row==='name'){p.name=el.value;p.fname=false;td.classList.remove('flag');}
+ else if(row==='group'){p.group=el.value;}
+ else{const v=el.value;p.stats[row].v=v===''?'':Number(v);p.stats[row].m=v!=='';td.classList.toggle('mk',v!=='');
+   if(row==='pts')updTeamConsistency();}
+ scheduleSave();
+}
+function readTop(){const d=DRAFTS[cur];if(!d)return;d.no=document.getElementById('f_no').value;d.venue=document.getElementById('f_venue').value;d.date=document.getElementById('f_date').value;
+ d.refMain=document.getElementById('f_main').value;d.refAsst=document.getElementById('f_asst').value;d.refScorer=document.getElementById('f_scorer').value;
+ d.fno=false;d.fmain=document.getElementById('f_main').value?false:d.fmain;d.fasst=document.getElementById('f_asst').value?false:d.fasst;d.fscorer=document.getElementById('f_scorer').value?false:d.fscorer;}
+async function go(dir){readTop();await doSave(DRAFTS[cur]);cur=(cur+dir+DRAFTS.length)%DRAFTS.length;render()}
+async function confirmCard(){readTop();const d=DRAFTS[cur];d.done=true;setSync('busy','確認並儲存到後端中…');
+ try{await fetch('/api/confirm',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload(d))});}
+ catch(e){d.done=false;setDot('⚠️ 儲存失敗');setSync('bad','⚠️ 儲存失敗，請確認服務還在執行');return;}
+ setDot('已儲存 ✓');flash('已確認第 '+(cur+1)+' 張');render();await verifySaved(d);}
+function toggleZoom(){document.getElementById('imgbox').classList.toggle('zoom')}
+load();
+</script></body></html>

@@ -1,0 +1,18 @@
+# Render 部署設定。在 Render 後台 New + → Blueprint → 連這個 repo 即可。
+# 部署後到 Service → Environment 設 DATABASE_URL / APP_USER / APP_PASS。
+services:
+  - type: web
+    name: bball
+    runtime: python
+    plan: free            # 免費方案閒置會休眠; 要不休眠改成 starter ($7/月)
+    buildCommand: pip install -r requirements.txt
+    startCommand: python3 server.py
+    envVars:
+      - key: DATABASE_URL  # Neon 連線字串 (postgres://...?sslmode=require)
+        sync: false
+      - key: APP_USER      # 登入帳號 (你和組員共用)
+        sync: false
+      - key: APP_PASS      # 登入密碼
+        sync: false
+      - key: PYTHON_VERSION
+        value: "3.12"
