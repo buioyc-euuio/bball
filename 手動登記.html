@@ -1,0 +1,238 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>傳統手動登記 ‧ 攻守紀錄</title>
+<style>
+:root{--bg:#f4f6f8;--card:#fff;--line:#d8dee6;--ink:#1f2733;--muted:#6b7785;--brand:#d6532b;--brandd:#b8431f;--A:#2563eb;--B:#16a34a;--soft:#eef2f6;
+--mk:#dff5e4;--mkb:#7cc894;--cf:#ffe0dd;--cfb:#e74c3c;--ok:#16794a;}
+*{box-sizing:border-box}body{margin:0;font-family:"PingFang TC","Microsoft JhengHei",Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:15px}
+header{background:var(--brand);color:#fff;padding:11px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+header h1{font-size:16px;margin:0}.prog{margin-left:auto;font-size:13.5px;background:rgba(255,255,255,.18);padding:5px 12px;border-radius:20px}
+.save-dot{font-size:12px;opacity:.9}
+header a{color:#fff;font-size:13px;background:rgba(255,255,255,.18);padding:5px 12px;border-radius:20px;text-decoration:none}
+header a:hover{background:rgba(255,255,255,.32)}
+.wrap{display:flex;gap:14px;padding:14px;align-items:flex-start;max-width:1600px;margin:0 auto}
+.col{flex:1;min-width:0}.col.left{flex:0 0 46%}
+.pdfbox{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;position:sticky;top:14px}
+.pdfbox select{width:100%;font-size:13.5px;padding:7px;border:1px solid var(--line);border-radius:7px;margin-bottom:8px}
+.pdfbox iframe{width:100%;height:80vh;border:1px solid var(--line);border-radius:8px;background:#fff}
+.pdfbox .none{padding:40px 10px;text-align:center;color:var(--muted);font-size:13.5px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+.card h2{margin:0 0 10px;font-size:15.5px}
+.top{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);font-weight:600}
+input,select{font-family:inherit;font-size:14px;padding:6px 7px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink)}
+.sheet{border-collapse:collapse;width:100%;font-size:13px;table-layout:fixed}
+.sheet th,.sheet td{border:1px solid var(--line);padding:2px;text-align:center;position:relative}
+.sheet th{background:var(--soft);font-size:11.5px;padding:5px 2px}
+.sheet th.pa{background:#e7effd;color:var(--A)}.sheet th.pb{background:#e6f6ec;color:var(--B)}
+.sheet td.lab{background:var(--soft);font-weight:700;font-size:11.5px;white-space:nowrap;width:88px;text-align:right;padding-right:6px}
+.sheet input,.sheet select{width:100%;border:none;text-align:center;padding:6px 1px;font-size:13px;border-radius:0;background:transparent}
+.sheet td.cell{padding:0}
+.totrow td{background:#fbfaf0;font-weight:800}
+.teamtot{padding:5px 6px!important;text-align:center;vertical-align:middle}
+.teamtot input{width:72px;text-align:center;font-weight:800;font-size:15px;border:1px solid var(--line);border-radius:6px;background:#fff;padding:5px;display:inline-block}
+.tothint{font-size:11px;font-weight:600;margin-top:3px}.tothint.ok{color:var(--ok)}.tothint.bad{color:var(--cfb)}
+.teamtot.bad{background:var(--cf);outline:2px solid var(--cfb);outline-offset:-2px}
+.win{color:var(--ok)}.badge{font-size:11px;padding:2px 7px;border-radius:20px;color:#fff;font-weight:700}.badge.A{background:var(--A)}.badge.B{background:var(--B)}
+.refs{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+.btn{background:var(--brand);color:#fff;border:none;border-radius:8px;padding:9px 15px;font-weight:700;cursor:pointer;font-size:14px}
+.btn:hover{background:var(--brandd)}.btn.save{background:#0f766e}.btn.save:hover{background:#0b5d57}
+.ghost{background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 13px;cursor:pointer;font-weight:600}
+.ghost:hover{background:var(--soft)}.ghost.danger{color:#a3271b;border-color:#f0c4bd}
+.nav{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.sync{margin-top:10px;font-size:13px;font-weight:600;padding:8px 12px;border-radius:8px;background:var(--soft);color:var(--muted);border:1px solid var(--line)}
+.sync.ok{background:var(--mk);border-color:var(--mkb);color:var(--ok)}.sync.bad{background:var(--cf);border-color:var(--cfb);color:#a3271b}.sync.busy{background:#fff5d1;border-color:#e8c84b;color:#8a6d1b}
+.done-badge{color:var(--ok);font-weight:700;font-size:13px;background:var(--mk);border:1px solid var(--mkb);padding:2px 9px;border-radius:20px}
+.pend-badge{color:var(--muted);font-weight:600;font-size:13px;background:var(--soft);border:1px solid var(--line);padding:2px 9px;border-radius:20px}
+.sheetnav{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}
+.chip{min-width:30px;padding:5px 9px;border:1px solid var(--line);border-radius:7px;background:#fff;cursor:pointer;font-size:12.5px;font-weight:700;color:var(--muted)}
+.chip:hover{background:var(--soft)}.chip.done{background:var(--mk);border-color:var(--mkb);color:var(--ok)}
+.chip.cur{outline:2px solid var(--brand);outline-offset:-2px;color:var(--ink)}
+.chip.add{color:var(--brandd);border-style:dashed}
+.flash{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#1f2733;color:#fff;padding:9px 18px;border-radius:22px;opacity:0;transition:.3s;pointer-events:none;z-index:9}.flash.show{opacity:.95}
+@media(max-width:1000px){.wrap{flex-direction:column}.col.left{flex:auto}.pdfbox{position:static}.pdfbox iframe{height:60vh}}
+</style></head><body>
+<header><h1>✍️ 傳統手動登記 <span id="klassName" style="font-size:13px;background:rgba(255,255,255,.22);padding:3px 10px;border-radius:20px"></span></h1>
+<span class="save-dot" id="saveDot">連線中…</span>
+<a id="navHome" href="/">🏠 班級總覽</a>
+<a id="navAI" href="/校對">🃏 AI 閃卡模式</a>
+<a id="navSummary" href="/summary">📊 統計總表</a>
+<span class="prog" id="prog"></span></header>
+<div class="wrap">
+ <div class="col left"><div class="pdfbox">
+   <select id="pdfSel" onchange="showPdf()"></select>
+   <div id="pdfHost"></div>
+ </div></div>
+ <div class="col">
+   <div class="card" style="padding:11px 14px">
+     <h2 style="margin-bottom:7px">📋 已登記場次 <span id="navsummary" style="font-size:12.5px;color:var(--muted);font-weight:400"></span></h2>
+     <div class="sheetnav" id="sheetnav"></div>
+     <div style="font-size:11.5px;color:var(--muted);margin-top:7px">綠色 ✓ ＝已確認；灰色 ＝草稿。點任一格切換，最右「＋」新增一張空白表。</div>
+   </div>
+   <div class="card">
+     <h2>第 <span id="idx"></span> 張 <span id="doneTag"></span></h2>
+     <div class="top">
+       <label class="f">場次<input type="number" id="f_no" style="width:80px"></label>
+       <label class="f">場地<input type="text" id="f_venue" style="width:64px"></label>
+       <label class="f">日期(可空)<input type="date" id="f_date"></label>
+     </div>
+     <table class="sheet" id="sheet"></table>
+     <div class="refs">
+       <label class="f">主裁判<input id="f_main" list="roster" autocomplete="off" style="width:120px"></label>
+       <label class="f">副裁判<input id="f_asst" list="roster" autocomplete="off" style="width:120px"></label>
+       <label class="f">紀錄<input id="f_scorer" list="roster" autocomplete="off" style="width:120px"></label>
+     </div>
+     <div class="nav">
+       <button class="ghost" onclick="go(-1)">← 上一張</button>
+       <button class="btn save" onclick="saveNow()">💾 儲存到後端</button>
+       <button class="btn" onclick="confirmCard()">✓ 確認完全正確</button>
+       <button class="ghost" onclick="newSheet()">＋ 新增一張</button>
+       <button class="ghost danger" onclick="delSheet()">🗑 刪除此張</button>
+       <button class="ghost" onclick="go(1)">下一張 →</button>
+     </div>
+     <div class="sync" id="syncStatus">逐格鍵入；右手點格、左手用方向鍵 ↑↓ 加減分數。</div>
+   </div>
+ </div>
+</div>
+<div class="flash" id="flash"></div>
+<datalist id="roster"></datalist>
+<script>
+const KLASS=new URLSearchParams(location.search).get('klass')||'';
+const Q=KLASS?('?klass='+encodeURIComponent(KLASS)):'';
+const MANUAL_URL='/api/sheets'+Q+(KLASS?'&':'?')+'source=manual';
+if(KLASS){document.getElementById('klassName').textContent='｜'+KLASS;
+  document.getElementById('navAI').href='/校對'+Q;
+  document.getElementById('navSummary').href='/summary'+Q;}
+let ROSTER=[], DRAFTS=[], UPLOADS=[], cur=0;
+const STAT_KEYS=['pts','foul','tfoul','ast','oreb','dreb','stl'];
+const ROWS=[['group','組別','text'],['name','姓名','name'],['pts','得分(正字筆數)','stat'],['foul','犯規','stat'],['tfoul','團犯','stat'],['ast','助攻','stat'],['oreb','進攻籃板','stat'],['dreb','防守籃板','stat'],['stl','抄截','stat']];
+function esc(s){return(s+'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function flash(m){const f=document.getElementById('flash');f.textContent=m;f.classList.add('show');setTimeout(()=>f.classList.remove('show'),1400)}
+function num(x){return x===''||x==null?null:Number(x)}
+function setDot(t){document.getElementById('saveDot').textContent=t;}
+function setSync(cls,msg){const e=document.getElementById('syncStatus');e.className='sync '+cls;e.textContent=msg;}
+
+function blankStats(){const o={};STAT_KEYS.forEach(k=>o[k]={v:'',m:false});return o;}
+function mk(team){return{team,name:'',fname:false,group:'',maybe3:false,note:'',stats:blankStats()};}
+let mseq=0;
+function nextSid(){
+  // 掃描既有 manual sid 取最大編號, 確保新張不撞號。
+  let mx=0;
+  DRAFTS.forEach(d=>{const m=/-m(\d+)$/.exec(d.sid||'');if(m)mx=Math.max(mx,+m[1]);});
+  mseq=Math.max(mseq,mx)+1;
+  return (KLASS||'班')+'-m'+mseq;
+}
+function blankSheet(){return{sid:nextSid(),no:'',venue:'',date:'',totalA:'',totalB:'',
+  refMain:'',refAsst:'',refScorer:'',fmain:false,fasst:false,fscorer:false,fno:false,fvenue:false,
+  note:'',done:false,source:'manual',players:[mk('A'),mk('A'),mk('A'),mk('B'),mk('B'),mk('B')]};}
+function fillStats(list){list.forEach(d=>d.players.forEach(p=>{p.stats=p.stats||{};STAT_KEYS.forEach(k=>{if(!p.stats[k])p.stats[k]={v:'',m:false};});}));}
+function payload(d){const o=JSON.parse(JSON.stringify(d));delete o.img;o.klass=KLASS;o.source='manual';return o;}
+
+function teamSumPts(t){return DRAFTS[cur].players.filter(p=>p.team===t).reduce((s,p)=>s+(num(p.stats.pts.v)||0),0);}
+function updTeamConsistency(){
+ const d=DRAFTS[cur];if(!d)return;
+ ['A','B'].forEach(t=>{
+   const sum=teamSumPts(t),tot=num(d['total'+t]);
+   const cell=document.getElementById('totcell'+t),hint=document.getElementById('hint'+t);
+   if(!cell||!hint)return;
+   if(tot==null){hint.className='tothint';hint.textContent='三人加總 '+sum;cell.classList.remove('bad');}
+   else if(tot===sum){hint.className='tothint ok';hint.textContent='✓ 與加總一致（'+sum+'）';cell.classList.remove('bad');}
+   else{hint.className='tothint bad';hint.textContent='⚠ 三人加總 '+sum+'，與總分不符';cell.classList.add('bad');}
+ });
+ const a=num(d.totalA),b=num(d.totalB);
+ const wa=document.getElementById('winA'),wb=document.getElementById('winB');
+ if(wa)wa.innerHTML=(a!=null&&b!=null&&a>b)?'<span class="win">🏆勝</span>':'';
+ if(wb)wb.innerHTML=(a!=null&&b!=null&&b>a)?'<span class="win">🏆勝</span>':'';
+}
+function onTeamTotal(team,el){DRAFTS[cur]['total'+team]=el.value===''?'':Number(el.value);updTeamConsistency();}
+function onChange(el){
+ const d=DRAFTS[cur],i=+el.dataset.i,row=el.dataset.row,p=d.players[i];
+ if(row==='name')p.name=el.value;
+ else if(row==='group')p.group=el.value;
+ else{const v=el.value;p.stats[row].v=v===''?'':Number(v);if(row==='pts')updTeamConsistency();}
+}
+function readTop(){const d=DRAFTS[cur];if(!d)return;
+ d.no=document.getElementById('f_no').value;d.venue=document.getElementById('f_venue').value;d.date=document.getElementById('f_date').value;
+ d.refMain=document.getElementById('f_main').value;d.refAsst=document.getElementById('f_asst').value;d.refScorer=document.getElementById('f_scorer').value;}
+
+function render(){
+ const d=DRAFTS[cur];if(!d)return;
+ document.getElementById('idx').textContent=(cur+1)+' / '+DRAFTS.length;
+ document.getElementById('doneTag').innerHTML=d.done?'<span class="done-badge">✓ 已確認</span>':'<span class="pend-badge">草稿</span>';
+ document.getElementById('f_no').value=d.no||'';document.getElementById('f_venue').value=d.venue||'';document.getElementById('f_date').value=d.date||'';
+ document.getElementById('f_main').value=d.refMain||'';document.getElementById('f_asst').value=d.refAsst||'';document.getElementById('f_scorer').value=d.refScorer||'';
+ const P=d.players;let h='<thead><tr><th>項目</th>';
+ P.forEach((p,i)=>h+=`<th class="${p.team==='A'?'pa':'pb'}">${['①','②','③','④','⑤','⑥'][i]||i+1}<br>${p.team}隊</th>`);
+ h+='</tr></thead><tbody>';
+ ROWS.forEach(([k,lab,type])=>{
+   h+=`<tr><td class="lab">${lab}</td>`;
+   P.forEach((p,i)=>{
+     if(type==='name')h+=`<td class="cell"><input class="cmb" list="roster" autocomplete="off" data-i="${i}" data-row="name" value="${esc(p.name)}" oninput="onChange(this)" placeholder="輸入或選擇"></td>`;
+     else if(type==='text')h+=`<td class="cell"><input data-i="${i}" data-row="group" value="${esc(p.group||'')}" oninput="onChange(this)"></td>`;
+     else{const c=p.stats[k]||{v:''};h+=`<td class="cell"><input type="number" min="0" data-i="${i}" data-row="${k}" value="${c.v===''||c.v==null?'':c.v}" oninput="onChange(this)"></td>`;}
+   });
+   h+='</tr>';
+ });
+ const tA=d.totalA,tB=d.totalB;
+ h+=`<tr class="totrow"><td class="lab">總得分</td>`+
+    `<td class="cell teamtot" colspan="3" id="totcellA"><span class="badge A">A</span> <input type="number" min="0" id="teamTotalA" value="${tA===''||tA==null?'':tA}" oninput="onTeamTotal('A',this)"> <span id="winA"></span><div class="tothint" id="hintA"></div></td>`+
+    `<td class="cell teamtot" colspan="3" id="totcellB"><span class="badge B">B</span> <input type="number" min="0" id="teamTotalB" value="${tB===''||tB==null?'':tB}" oninput="onTeamTotal('B',this)"> <span id="winB"></span><div class="tothint" id="hintB"></div></td></tr>`;
+ h+='</tbody>';
+ document.getElementById('sheet').innerHTML=h;
+ updTeamConsistency();renderNav();
+ const done=DRAFTS.filter(x=>x.done).length;
+ document.getElementById('prog').textContent='已登記 '+DRAFTS.length+' 張 ‧ '+done+' 已確認';
+ setSync('',d.done?'此張已確認。修改後再按「💾 儲存到後端」。':'草稿。逐格鍵入；右手點格、左手方向鍵 ↑↓ 加減分數。完成按「✓ 確認完全正確」。');
+}
+function renderNav(){
+ const done=DRAFTS.filter(x=>x.done).length;
+ document.getElementById('navsummary').textContent='（已確認 '+done+' / '+DRAFTS.length+' 張）';
+ let h=DRAFTS.map((d,i)=>`<button class="chip ${d.done?'done':''} ${i===cur?'cur':''}" onclick="gotoSheet(${i})">${d.done?'✓ ':''}${i+1}</button>`).join('');
+ h+=`<button class="chip add" onclick="newSheet()" title="新增一張空白表">＋</button>`;
+ document.getElementById('sheetnav').innerHTML=h;
+}
+async function gotoSheet(i){if(i===cur)return;readTop();cur=i;render();}
+async function go(dir){readTop();cur=(cur+dir+DRAFTS.length)%DRAFTS.length;render();}
+function newSheet(){readTop();DRAFTS.push(blankSheet());cur=DRAFTS.length-1;render();flash('已新增一張空白表');}
+
+async function saveNow(){readTop();const d=DRAFTS[cur];setSync('busy','儲存中…');
+ try{await fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload(d))});
+   setDot('已儲存 ✓');setSync('ok','✅ 已儲存到後端（草稿）。');}
+ catch(e){setSync('bad','⚠️ 儲存失敗，請確認服務還在執行');}}
+async function confirmCard(){readTop();const d=DRAFTS[cur];d.done=true;setSync('busy','確認並儲存中…');
+ try{await fetch('/api/confirm',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload(d))});
+   setDot('已儲存 ✓');flash('已確認第 '+(cur+1)+' 張');render();}
+ catch(e){d.done=false;setSync('bad','⚠️ 儲存失敗');}}
+async function delSheet(){
+ const d=DRAFTS[cur];
+ if(!confirm('刪除第 '+(cur+1)+' 張？此張會從後端移除。'))return;
+ try{await fetch('/api/sheet/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sid:d.sid,klass:KLASS})});}catch(e){}
+ DRAFTS.splice(cur,1);if(!DRAFTS.length)DRAFTS.push(blankSheet());cur=Math.max(0,cur-1);render();flash('已刪除');
+}
+
+function showPdf(){
+ const sel=document.getElementById('pdfSel'),host=document.getElementById('pdfHost');
+ if(!UPLOADS.length){host.innerHTML='<div class="none">這個班還沒有上傳 PDF。<br>可先到「上傳記錄表」上傳，或直接看紙本登記。</div>';return;}
+ const id=sel.value;
+ host.innerHTML='<iframe src="/api/upload/'+id+'/file" title="PDF"></iframe>'
+   +'<div style="text-align:center;margin-top:6px;font-size:12.5px">'
+   +'若上方沒顯示，<a href="/api/upload/'+id+'/file" target="_blank" rel="noopener" style="color:var(--brandd);font-weight:700">↗ 點此在新分頁開啟 PDF</a></div>';
+}
+async function load(){
+ try{
+   const [sh,ups]=await Promise.all([
+     fetch(MANUAL_URL).then(r=>r.json()),
+     fetch('/api/uploads'+Q).then(r=>r.json())
+   ]);
+   ROSTER=sh.roster||[];DRAFTS=sh.sheets||[];UPLOADS=ups||[];
+   fillStats(DRAFTS);
+   if(!DRAFTS.length)DRAFTS.push(blankSheet());
+   document.getElementById('roster').innerHTML=ROSTER.map(n=>'<option value="'+esc(n)+'"></option>').join('');
+   document.getElementById('pdfSel').innerHTML=UPLOADS.length
+     ? UPLOADS.map(u=>'<option value="'+u.id+'">📄 '+esc(u.filename)+'（'+esc(u.status)+'）</option>').join('')
+     : '<option>（尚無上傳的 PDF）</option>';
+   setDot('已連線 ✓');showPdf();render();
+ }catch(e){setDot('⚠️ 無法連線');document.body.insertAdjacentHTML('afterbegin','<div style="background:#ffe0dd;color:#a3271b;padding:14px;text-align:center">無法連到服務，請確認 server.py 正在執行。</div>');}
+}
+load();
+</script></body></html>

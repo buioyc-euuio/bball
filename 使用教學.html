@@ -1,0 +1,58 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>使用教學 ‧ 籃球攻守紀錄</title>
+<style>
+:root{--bg:#f4f6f8;--card:#fff;--line:#d8dee6;--ink:#1f2733;--muted:#6b7785;--brand:#d6532b;--brandd:#b8431f;--soft:#eef2f6;--ok:#16794a;--mk:#dff5e4;--mkb:#7cc894;--warn:#8a6d1b;--warnb:#e8c84b;}
+*{box-sizing:border-box}body{margin:0;font-family:"PingFang TC","Microsoft JhengHei",Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:15.5px;line-height:1.75}
+header{background:var(--brand);color:#fff;padding:11px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+header h1{font-size:17px;margin:0}
+header a{color:#fff;font-size:13px;background:rgba(255,255,255,.2);padding:6px 13px;border-radius:20px;text-decoration:none;margin-left:auto}
+header a:hover{background:rgba(255,255,255,.34)}
+.wrap{max-width:680px;margin:0 auto;padding:18px 18px 60px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 22px;margin-bottom:14px}
+.lead{margin:0 0 4px;font-size:15px}
+.step{display:flex;gap:14px;padding:15px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step .n{flex:none;width:32px;height:32px;border-radius:50%;background:var(--brand);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:16px}
+.step .b{flex:1}.step .b b{font-size:16px}
+.step ul{margin:8px 0 0;padding-left:20px}.step li{margin:5px 0;font-size:14.5px}
+.pill{display:inline-block;background:var(--soft);border:1px solid var(--line);border-radius:7px;padding:1px 8px;font-weight:700;font-size:14px}
+.pill.go{background:var(--brand);color:#fff;border-color:var(--brand)}
+.pill.ok{background:var(--mk);color:var(--ok);border-color:var(--mkb)}
+.tip{background:#fff8ef;border:1px solid #f3d9bf;color:#8a5a2b;border-radius:9px;padding:10px 13px;font-size:13.5px;margin-top:14px}
+</style></head><body>
+<header><h1>📖 使用教學</h1>
+<a href="/">🏠 回班級總覽</a></header>
+<div class="wrap">
+  <div class="card">
+    <p class="lead">把攻守記錄表登記成數位資料、產出統計。<b>依下面 5 步操作即可</b>，全程在這個網站完成。</p>
+    <div class="step"><div class="n">1</div><div class="b">
+      <b>新增班級</b><br>
+      首頁左側「班級」按 <span class="pill">＋ 新增班級</span>，輸入班名。每個班的資料、名單、統計都各自獨立。
+    </div></div>
+    <div class="step"><div class="n">2</div><div class="b">
+      <b>上傳 PDF</b><br>
+      選好班級，把攻守記錄表的 PDF 拖進「📎 待辨識收件匣」（或點擊選檔，可一次多張）。
+    </div></div>
+    <div class="step"><div class="n">3</div><div class="b">
+      <b>新增球員名單</b><br>
+      在「👥 球員名單」貼上全班姓名（一行一位，或用空白／逗號分隔），按 <span class="pill">儲存名單</span>。
+    </div></div>
+    <div class="step"><div class="n">4</div><div class="b">
+      <b>點 <span class="pill go">🔍 人工比對</span>，登記攻守記錄表</b><br>
+      左邊是原始記錄表、右邊是登記表格，逐格對照輸入。
+      <ul>
+        <li><b>球員姓名</b>：直接打字，會跳出名單供你快速選取。</li>
+        <li><b>調分數</b>：右手用滑鼠點該格，左手按鍵盤<b>方向鍵 ↑↓</b>就能加減該格分數。</li>
+        <li>整張都對了，按 <span class="pill ok">✓ 確認完全正確</span> → 上方那張的方格會變<b>綠色勾勾</b>。</li>
+        <li>還沒登記完想先存，按 <span class="pill">💾 儲存到後端</span> 暫存，下次回來接著做。</li>
+      </ul>
+    </div></div>
+    <div class="step"><div class="n">5</div><div class="b">
+      <b>匯出統計</b><br>
+      全部登記完，點 <span class="pill">📊 統計總表</span> → 按 <span class="pill">⬇️ 匯出 CSV</span>，用 Excel 開即可。
+    </div></div>
+    <div class="tip">💡 只會統計「已確認完全正確」的場次；改資料不會動到別班、也不會蓋掉別人已確認的場次，放心操作。</div>
+  </div>
+</div>
+</body></html>

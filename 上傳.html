@@ -1,0 +1,110 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>上傳攻守記錄表 ‧ 籃球</title>
+<style>
+:root{--bg:#f4f6f8;--card:#fff;--line:#d8dee6;--ink:#1f2733;--muted:#6b7785;--brand:#d6532b;--brandd:#b8431f;--soft:#eef2f6;--ok:#16794a;--mk:#dff5e4;--mkb:#7cc894;--warn:#8a6d1b;--warnb:#e8c84b;}
+*{box-sizing:border-box}body{margin:0;font-family:"PingFang TC","Microsoft JhengHei",Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:15px}
+header{background:var(--brand);color:#fff;padding:11px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+header h1{font-size:17px;margin:0}
+header a{color:#fff;font-size:13px;background:rgba(255,255,255,.2);padding:6px 13px;border-radius:20px;text-decoration:none;margin-left:auto}
+header a:hover{background:rgba(255,255,255,.34)}
+.wrap{max-width:680px;margin:0 auto;padding:18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:14px}
+.card h2{margin:0 0 4px;font-size:17px}.card .desc{color:var(--muted);font-size:13px;margin:0 0 14px}
+label.f{display:block;font-size:12.5px;color:var(--muted);font-weight:700;margin-bottom:5px}
+select{width:100%;font-family:inherit;font-size:16px;padding:11px;border:1px solid var(--line);border-radius:9px;background:#fff}
+.drop{border:2px dashed var(--line);border-radius:13px;padding:34px 16px;text-align:center;color:var(--muted);cursor:pointer;background:#fafbfc;margin-top:14px}
+.drop.over{border-color:var(--brand);background:#fff7f3;color:var(--brandd)}
+.drop .big{font-size:34px}.drop .t{font-size:15px;font-weight:700;color:var(--ink);margin-top:6px}
+.drop .s{font-size:12.5px;margin-top:3px}
+.warn{background:#fff5d1;border:1px solid var(--warnb);color:var(--warn);border-radius:9px;padding:10px 12px;font-size:13px;margin-top:12px}
+.uplist{list-style:none;margin:6px 0 0;padding:0}
+.uplist li{display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--line);border-radius:9px;margin-bottom:6px;font-size:13.5px}
+.uplist .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tag{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px}
+.tag.wait{background:#fff5d1;color:var(--warn);border:1px solid var(--warnb)}
+.tag.done{background:var(--mk);color:var(--ok);border:1px solid var(--mkb)}
+.empty{color:var(--muted);font-size:13px;padding:10px 2px}
+.ghost{background:#fff;border:1px solid var(--line);border-radius:8px;padding:4px 10px;cursor:pointer;font-weight:600;font-size:12.5px;text-decoration:none;color:var(--ink)}
+.ghost.danger{color:#a3271b;border-color:#f0c4bd}
+.flash{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#1f2733;color:#fff;padding:9px 18px;border-radius:22px;opacity:0;transition:.3s;pointer-events:none;z-index:9}.flash.show{opacity:.95}
+</style></head><body>
+<header><h1>⬆️ 上傳攻守記錄表</h1>
+<a href="/">🏠 班級總覽</a></header>
+<div class="wrap">
+  <div class="card">
+    <h2>上傳到哪個班級？</h2>
+    <p class="desc">選好班級，再把攻守記錄表的 PDF 拖進來（或點擊選檔）。可一次多張。</p>
+    <label class="f">班級</label>
+    <select id="cls" onchange="onPick()"></select>
+    <div id="noRoster" class="warn" style="display:none">⚠️ 這個班還沒有球員名單。仍可上傳，但<b>辨識前要先建立名單</b>（請老師到「班級總覽」設定）。</div>
+    <div class="drop" id="drop">
+      <div class="big">📄⬆️</div>
+      <div class="t">點此選擇 PDF，或拖曳檔案到這裡</div>
+      <div class="s">只收 PDF；上傳後老師會辨識成草稿，再由助教校對</div>
+    </div>
+    <input type="file" id="file" accept="application/pdf,.pdf" multiple style="display:none">
+  </div>
+  <div class="card">
+    <h2>這個班已上傳的 PDF</h2>
+    <ul class="uplist" id="upList"><li class="empty">載入中…</li></ul>
+  </div>
+</div>
+<div class="flash" id="flash"></div>
+<script>
+let CLASSES=[];
+const preKlass=new URLSearchParams(location.search).get('klass')||'';
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+function flash(m){const f=document.getElementById('flash');f.textContent=m;f.classList.add('show');setTimeout(()=>f.classList.remove('show'),1600);}
+function curKlass(){return document.getElementById('cls').value;}
+async function api(u,o){return (await fetch(u,o)).json();}
+async function loadClasses(){
+  CLASSES=await api('/api/classes');
+  const sel=document.getElementById('cls');
+  if(!CLASSES.length){sel.innerHTML='<option value="">（尚無班級，請老師先新增）</option>';return;}
+  sel.innerHTML=CLASSES.map(c=>`<option value="${esc(c.name)}">${esc(c.name)}（名單 ${c.roster} ‧ 待辨識 ${c.pending_uploads}）</option>`).join('');
+  if(preKlass&&CLASSES.find(c=>c.name===preKlass))sel.value=preKlass;
+  onPick();
+}
+function onPick(){
+  const c=CLASSES.find(x=>x.name===curKlass());
+  document.getElementById('noRoster').style.display=(c&&c.roster===0)?'block':'none';
+  loadUploads();
+}
+async function loadUploads(){
+  const k=curKlass();const ul=document.getElementById('upList');
+  if(!k){ul.innerHTML='<li class="empty">請先選班級。</li>';return;}
+  const ups=await api('/api/uploads?klass='+encodeURIComponent(k));
+  if(!ups.length){ul.innerHTML='<li class="empty">還沒有上傳任何 PDF。</li>';return;}
+  ul.innerHTML=ups.map(u=>{
+    const tag=u.status==='待辨識'?'<span class="tag wait">待辨識</span>':'<span class="tag done">已辨識</span>';
+    return `<li><span class="nm">📄 ${esc(u.filename)}</span><span style="color:#6b7785;font-size:11px">${esc(u.uploaded_at||'')}</span>${tag}
+      <a class="ghost" href="/api/upload/${u.id}/file" target="_blank">看檔</a>
+      <button class="ghost danger" onclick="delUp(${u.id})">刪</button></li>`;
+  }).join('');
+}
+async function delUp(id){
+  if(!confirm('刪除這份 PDF？'))return;
+  await api('/api/upload/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
+  flash('已刪除');loadUploads();
+}
+async function upFiles(files){
+  const k=curKlass();
+  if(!k){flash('請先選班級');return;}
+  files=[...files].filter(f=>/pdf$/i.test(f.name)||f.type==='application/pdf');
+  if(!files.length){flash('請上傳 PDF 檔');return;}
+  for(const f of files){
+    flash('上傳中：'+f.name);
+    const data=await new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(f);});
+    await api('/api/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({klass:k,filename:f.name,data})});
+  }
+  flash('✅ 上傳完成，等待辨識');loadUploads();
+}
+const drop=document.getElementById('drop'),file=document.getElementById('file');
+drop.onclick=()=>file.click();
+file.onchange=()=>upFiles(file.files);
+drop.ondragover=e=>{e.preventDefault();drop.classList.add('over');};
+drop.ondragleave=()=>drop.classList.remove('over');
+drop.ondrop=e=>{e.preventDefault();drop.classList.remove('over');upFiles(e.dataTransfer.files);};
+loadClasses();
+</script></body></html>

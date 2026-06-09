@@ -1,0 +1,201 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>班級總覽 ‧ 籃球攻守紀錄</title>
+<style>
+:root{--bg:#f4f6f8;--card:#fff;--line:#d8dee6;--ink:#1f2733;--muted:#6b7785;--brand:#d6532b;--brandd:#b8431f;--soft:#eef2f6;--ok:#16794a;--mk:#dff5e4;--mkb:#7cc894;--warn:#8a6d1b;--warnb:#e8c84b;}
+*{box-sizing:border-box}body{margin:0;font-family:"PingFang TC","Microsoft JhengHei",Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:15px}
+header{background:var(--brand);color:#fff;padding:11px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+header h1{font-size:17px;margin:0}
+header a{color:#fff;font-size:13px;background:rgba(255,255,255,.2);padding:6px 13px;border-radius:20px;text-decoration:none;margin-left:auto}
+header a:hover{background:rgba(255,255,255,.34)}
+.layout{display:flex;gap:16px;max-width:1200px;margin:0 auto;padding:16px;align-items:flex-start}
+.side{flex:0 0 248px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;position:sticky;top:16px}
+.side h2{font-size:13px;color:var(--muted);margin:2px 4px 10px;letter-spacing:.05em}
+.clsbtn{display:block;width:100%;text-align:left;border:1px solid transparent;border-radius:9px;padding:10px 11px;background:transparent;cursor:pointer;margin-bottom:4px;font-size:14.5px;font-weight:700;color:var(--ink)}
+.clsbtn:hover{background:var(--soft)}
+.clsbtn.cur{background:#fff3ee;border-color:var(--brand);color:var(--brandd)}
+.clsbtn .sub{display:block;font-size:11.5px;color:var(--muted);font-weight:500;margin-top:2px}
+.clsbtn.arch{opacity:.55}
+.dot{display:inline-block;min-width:18px;text-align:center;font-size:11px;font-weight:800;color:#fff;background:var(--brand);border-radius:10px;padding:1px 6px;margin-left:4px}
+.addbtn{width:100%;border:1.5px dashed var(--line);background:#fff;border-radius:9px;padding:10px;cursor:pointer;font-weight:700;color:var(--brandd);margin-top:6px}
+.addbtn:hover{border-color:var(--brand);background:#fff7f3}
+.archtoggle{font-size:12px;color:var(--muted);margin-top:10px;display:block;cursor:pointer}
+.main{flex:1;min-width:0}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:14px}
+.panel h2{margin:0 0 4px;font-size:18px}
+.panel .desc{color:var(--muted);font-size:13px;margin:0 0 14px}
+.stats{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.stat{flex:1;min-width:96px;background:var(--soft);border-radius:10px;padding:11px 12px;text-align:center}
+.stat b{display:block;font-size:23px;line-height:1.1}.stat span{font-size:11.5px;color:var(--muted)}
+.stat.todo b{color:var(--brandd)}.stat.up b{color:var(--warn)}
+.acts{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+.act{flex:1;min-width:150px;display:flex;flex-direction:column;gap:3px;align-items:center;justify-content:center;text-decoration:none;border:1px solid var(--line);border-radius:11px;padding:15px 10px;background:#fff;color:var(--ink);font-weight:700;cursor:pointer}
+.act:hover{border-color:var(--brand);background:#fff7f3}
+.act .ic{font-size:24px}.act .s{font-size:11.5px;color:var(--muted);font-weight:500}
+.act.primary{background:var(--brand);color:#fff;border-color:var(--brand)}.act.primary .s{color:rgba(255,255,255,.85)}
+.act.primary:hover{background:var(--brandd)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.btn{background:var(--brand);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-weight:700;cursor:pointer;font-size:13.5px}
+.btn:hover{background:var(--brandd)}
+.ghost{background:#fff;border:1px solid var(--line);border-radius:8px;padding:7px 12px;cursor:pointer;font-weight:600;font-size:13px}
+.ghost:hover{background:var(--soft)}
+.ghost.danger{color:#a3271b;border-color:#f0c4bd}.ghost.danger:hover{background:#fff0ee}
+textarea{width:100%;min-height:120px;font-family:inherit;font-size:14px;padding:10px;border:1px solid var(--line);border-radius:9px;resize:vertical;line-height:1.7}
+.sechead{display:flex;align-items:center;gap:8px;margin:18px 0 8px;font-weight:800;font-size:14.5px}
+.sechead .n{font-size:12px;color:var(--muted);font-weight:500}
+.uplist{list-style:none;margin:8px 0 0;padding:0}
+.uplist li{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:9px;margin-bottom:6px;font-size:13px}
+.uplist .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tag{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px}
+.tag.wait{background:#fff5d1;color:var(--warn);border:1px solid var(--warnb)}
+.tag.done{background:var(--mk);color:var(--ok);border:1px solid var(--mkb)}
+.empty{color:var(--muted);text-align:center;padding:36px 10px}
+.drop{border:1.5px dashed var(--line);border-radius:11px;padding:18px;text-align:center;color:var(--muted);cursor:pointer;background:#fafbfc}
+.drop.over{border-color:var(--brand);background:#fff7f3;color:var(--brandd)}
+.flash{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#1f2733;color:#fff;padding:9px 18px;border-radius:22px;opacity:0;transition:.3s;pointer-events:none;z-index:9}.flash.show{opacity:.95}
+@media(max-width:820px){.layout{flex-direction:column}.side{position:static;width:100%;flex:auto}}
+</style></head><body>
+<header><h1>🏀 籃球攻守紀錄 ‧ 班級總覽</h1>
+<a href="/使用教學">📖 使用教學</a></header>
+<div class="layout">
+  <nav class="side">
+    <h2>班級</h2>
+    <div id="clsList"></div>
+    <button class="addbtn" onclick="addClass()">＋ 新增班級</button>
+    <label class="archtoggle"><input type="checkbox" id="showArch" onchange="loadClasses()"> 顯示已封存班級</label>
+  </nav>
+  <main class="main" id="main">
+    <div class="panel"><div class="empty">載入中…</div></div>
+  </main>
+</div>
+<div class="flash" id="flash"></div>
+<script>
+let CLASSES=[], cur=null;
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+function flash(m){const f=document.getElementById('flash');f.textContent=m;f.classList.add('show');setTimeout(()=>f.classList.remove('show'),1600);}
+function qk(k){return '?klass='+encodeURIComponent(k);}
+async function api(url,opt){const r=await fetch(url,opt);return r.json();}
+
+async function loadClasses(){
+  const all=document.getElementById('showArch').checked?'?all=1':'';
+  CLASSES=await api('/api/classes'+all);
+  const box=document.getElementById('clsList');
+  if(!CLASSES.length){box.innerHTML='<div style="color:#6b7785;font-size:13px;padding:6px 4px">尚無班級，按下方「新增班級」開始。</div>';renderMain();return;}
+  box.innerHTML=CLASSES.map(c=>{
+    const isCur=cur===c.name;
+    const pend=c.pending_uploads?`<span class="dot">${c.pending_uploads}待辨識</span>`:'';
+    return `<button class="clsbtn ${isCur?'cur':''} ${c.archived?'arch':''}" onclick="pick('${esc(c.name).replace(/'/g,"\\'")}')">
+      ${esc(c.name)}${c.archived?' 〔封存〕':''}${pend}
+      <span class="sub">名單 ${c.roster} ‧ ${c.confirmed}/${c.games} 已校對</span>
+    </button>`;
+  }).join('');
+  if(cur&&!CLASSES.find(c=>c.name===cur))cur=null;
+  if(!cur&&CLASSES.length)cur=CLASSES[0].name;
+  renderMain();
+}
+function pick(name){cur=name;loadClasses();}
+
+function curObj(){return CLASSES.find(c=>c.name===cur);}
+async function renderMain(){
+  const m=document.getElementById('main');
+  if(!cur){m.innerHTML='<div class="panel"><div class="empty">左側選一個班級，或先「＋ 新增班級」。</div></div>';return;}
+  const c=curObj();if(!c){m.innerHTML='';return;}
+  const q=qk(cur);
+  m.innerHTML=`<div class="panel">
+    <h2>${esc(cur)} ${c.archived?'<span style="font-size:13px;color:#6b7785">（已封存）</span>':''}</h2>
+    <p class="desc">名單 ${c.roster} 位 ‧ 已建立 ${c.games} 場 ‧ 已校對 ${c.confirmed} 場${c.pending_uploads?` ‧ <b style="color:#8a6d1b">${c.pending_uploads} 份 PDF 待辨識</b>`:''}</p>
+    <div class="stats">
+      <div class="stat"><b>${c.roster}</b><span>名單人數</span></div>
+      <div class="stat"><b>${c.games}</b><span>場次</span></div>
+      <div class="stat todo"><b>${c.todo}</b><span>待校對</span></div>
+      <div class="stat up"><b>${c.pending_uploads}</b><span>待辨識PDF</span></div>
+    </div>
+    <div class="acts">
+      <a class="act primary" href="/校對${q}"><span class="ic">🔍</span>人工比對<span class="s">逐場對照原圖修正</span></a>
+      <a class="act" href="/summary${q}"><span class="ic">📊</span>統計總表<span class="s">14 欄彙整 ‧ 匯出CSV</span></a>
+    </div>
+    <div class="sechead">👥 球員名單 <span class="n">一行一位，或用空白／逗號分隔。儲存即覆寫此班名單。</span></div>
+    <textarea id="rosterTa" placeholder="王小明&#10;李大華&#10;陳美麗…"></textarea>
+    <div class="row"><button class="btn" onclick="saveRoster()">儲存名單</button>
+      <span id="rosterMsg" style="font-size:12.5px;color:#6b7785"></span></div>
+
+    <div class="sechead">📎 待辨識收件匣 <span class="n">助教上傳的 PDF 會列在這；辨識請用「辨識_貼上即可」prompt。</span></div>
+    <div class="drop" id="drop" onclick="document.getElementById('file').click()">
+      點此或拖曳 PDF 到這裡上傳到「${esc(cur)}」</div>
+    <input type="file" id="file" accept="application/pdf,.pdf" multiple style="display:none" onchange="upFiles(this.files)">
+    <ul class="uplist" id="upList"></ul>
+
+    <div class="sechead">⚙️ 班級設定</div>
+    <div class="row">
+      <button class="ghost" onclick="renameClass()">✏️ 改名</button>
+      ${c.archived
+        ? `<button class="ghost" onclick="archiveClass(false)">↩️ 取消封存</button>`
+        : `<button class="ghost danger" onclick="archiveClass(true)">🗄 封存（結束此班，隱藏但保留資料）</button>`}
+    </div>
+  </div>`;
+  loadRoster();loadUploads();bindDrop();
+}
+
+async function loadRoster(){
+  const names=await api('/api/roster'+qk(cur));
+  const ta=document.getElementById('rosterTa');if(ta)ta.value=names.join('\n');
+}
+async function saveRoster(){
+  const text=document.getElementById('rosterTa').value;
+  const r=await api('/api/roster/set',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({klass:cur,text})});
+  document.getElementById('rosterMsg').textContent='已儲存 '+r.count+' 位';
+  flash('名單已儲存（'+r.count+' 位）');loadClasses();
+}
+async function loadUploads(){
+  const ups=await api('/api/uploads'+qk(cur));
+  const ul=document.getElementById('upList');if(!ul)return;
+  if(!ups.length){ul.innerHTML='<li style="border:none;color:#6b7785">目前沒有上傳的 PDF。</li>';return;}
+  ul.innerHTML=ups.map(u=>{
+    const tag=u.status==='待辨識'?'<span class="tag wait">待辨識</span>':'<span class="tag done">已辨識</span>';
+    return `<li><span class="nm">📄 ${esc(u.filename)}</span><span style="color:#6b7785;font-size:11.5px">${esc(u.uploaded_at||'')}</span>${tag}
+      <a class="ghost" href="/api/upload/${u.id}/file" target="_blank" style="padding:3px 9px">看檔</a>
+      <button class="ghost danger" style="padding:3px 9px" onclick="delUpload(${u.id})">刪</button></li>`;
+  }).join('');
+}
+async function delUpload(id){
+  if(!confirm('刪除這份上傳的 PDF？（不影響已辨識出來的場次）'))return;
+  await api('/api/upload/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
+  flash('已刪除');loadUploads();loadClasses();
+}
+function bindDrop(){
+  const d=document.getElementById('drop');if(!d)return;
+  d.ondragover=e=>{e.preventDefault();d.classList.add('over');};
+  d.ondragleave=()=>d.classList.remove('over');
+  d.ondrop=e=>{e.preventDefault();d.classList.remove('over');upFiles(e.dataTransfer.files);};
+}
+async function upFiles(files){
+  files=[...files].filter(f=>/pdf$/i.test(f.name)||f.type==='application/pdf');
+  if(!files.length){flash('請上傳 PDF 檔');return;}
+  for(const f of files){
+    flash('上傳中：'+f.name);
+    const data=await new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(f);});
+    await api('/api/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({klass:cur,filename:f.name,data})});
+  }
+  flash('上傳完成');loadUploads();loadClasses();
+}
+async function addClass(){
+  const name=prompt('新班級名稱（例如：體育二甲、週三女籃）');
+  if(!name)return;
+  const r=await api('/api/class/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});
+  if(!r.ok){flash(r.msg||'新增失敗');return;}
+  cur=name.trim();flash('已新增班級');loadClasses();
+}
+async function renameClass(){
+  const nn=prompt('新名稱：',cur);if(!nn||nn===cur)return;
+  const r=await api('/api/class/rename',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({old:cur,new:nn})});
+  if(!r.ok){flash(r.msg||'改名失敗');return;}
+  cur=nn.trim();flash('已改名');loadClasses();
+}
+async function archiveClass(on){
+  if(on&&!confirm('封存「'+cur+'」？\n資料完整保留、只是從清單隱藏；可勾選「顯示已封存班級」找回。'))return;
+  const r=await api('/api/class/archive',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:cur,archived:on})});
+  if(!r.ok){flash(r.msg||'操作失敗');return;}
+  flash(on?'已封存':'已取消封存');loadClasses();
+}
+loadClasses();
+</script></body></html>

@@ -7,7 +7,7 @@
 """
 import os, re, json, sqlite3, base64, webbrowser, threading, time, hashlib, contextlib, base64 as _b64
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
-from urllib.parse import urlparse, unquote
+from urllib.parse import urlparse, unquote, parse_qs
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DB = os.path.join(HERE, "bball.db")
@@ -27,6 +27,9 @@ if PG:
 
 # 每位球員各自的欄位(不含總得分; 總得分改為隊伍級, 存在 games.total_a/total_b)
 STAT_KEYS = ["pts", "foul", "tfoul", "ast", "oreb", "dreb", "stl"]
+
+# 多班級: 既有(單班時代)資料一律歸到這個預設班, 之後可在 UI 改名。
+DEFAULT_KLASS = "女籃3對3"
 
 # ---------------------------------------------------------------- DB layer
 def conn():
@@ -96,6 +99,7 @@ def backup_db(keep=40):
 def init_db():
     c = conn()
     pk = "SERIAL PRIMARY KEY" if PG else "INTEGER PRIMARY KEY AUTOINCREMENT"
+    blob = "BYTEA" if PG else "BLOB"
     stmts = [
         "CREATE TABLE IF NOT EXISTS players(name TEXT PRIMARY KEY, ord INTEGER)",
         f"""CREATE TABLE IF NOT EXISTS games(
@@ -122,6 +126,27 @@ def init_db():
           conflict INTEGER DEFAULT 0, maybe3 INTEGER DEFAULT 0,
           marks TEXT, note TEXT
         )""",
+        # ── 多班級新增表 (additive, 不動既有表) ──
+        # classes: 每個班一列。archived=1 表示「已結束/封存」(隱藏但不刪資料)。
+        f"""CREATE TABLE IF NOT EXISTS classes(
+          id {pk},
+          name TEXT UNIQUE,
+          created TEXT,
+          archived INTEGER DEFAULT 0
+        )""",
+        # roster: 各班名單(取代全域 players)。同名可在不同班各存一份。
+        f"""CREATE TABLE IF NOT EXISTS roster(
+          id {pk},
+          klass TEXT, name TEXT, ord INTEGER
+        )""",
+        # uploads: 助教上傳的攻守記錄表 PDF 收件匣。data 存原始位元組(雲端正本)。
+        f"""CREATE TABLE IF NOT EXISTS uploads(
+          id {pk},
+          klass TEXT, filename TEXT, mime TEXT,
+          data {blob},
+          status TEXT DEFAULT '待辨識',
+          uploaded_at TEXT, note TEXT
+        )""",
     ]
     for s in stmts:
         c.execute(s)
@@ -134,8 +159,69 @@ def init_db():
                 c.execute(f"ALTER TABLE games ADD COLUMN {col} INTEGER")
             except sqlite3.OperationalError:
                 pass
+    # games 補班別欄
+    if PG:
+        c.execute("ALTER TABLE games ADD COLUMN IF NOT EXISTS klass TEXT")
+    else:
+        try:
+            c.execute("ALTER TABLE games ADD COLUMN klass TEXT")
+        except sqlite3.OperationalError:
+            pass
+    # games 補來源欄: 'ai'=AI辨識草稿(需逐格驗證) / 'manual'=助教傳統手動登記。
+    if PG:
+        c.execute("ALTER TABLE games ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'ai'")
+    else:
+        try:
+            c.execute("ALTER TABLE games ADD COLUMN source TEXT DEFAULT 'ai'")
+        except sqlite3.OperationalError:
+            pass
+    # roster 同班不重名
+    if PG:
+        c.execute("CREATE UNIQUE INDEX IF NOT EXISTS roster_klass_name ON roster(klass, name)")
+    else:
+        c.execute("CREATE UNIQUE INDEX IF NOT EXISTS roster_klass_name ON roster(klass, name)")
+    c.commit()
+    migrate_to_classes(c)
     c.commit()
     c.close()
+
+def migrate_to_classes(c):
+    """把單班時代的資料一次性歸到 DEFAULT_KLASS, 冪等可重跑:
+       1. 確保 DEFAULT_KLASS 這個班存在。
+       2. 既有 games.klass 為 NULL 的, 補成 DEFAULT_KLASS。
+       3. 把全域 players 名單複製進 roster(DEFAULT_KLASS)。
+       完全 additive — 不刪 players、不動 stat_lines。"""
+    # 還沒有任何班別資料才需要遷移(避免重跑覆寫使用者後來改的班名)
+    has_klass = c.execute("SELECT COUNT(*) AS n FROM games WHERE klass IS NOT NULL AND klass<>''").fetchone()["n"]
+    n_games = c.execute("SELECT COUNT(*) AS n FROM games").fetchone()["n"]
+    n_classes = c.execute("SELECT COUNT(*) AS n FROM classes").fetchone()["n"]
+    # 有 games 但都還沒分班 → 視為待遷移的舊資料庫
+    if n_games and not has_klass:
+        _ensure_class(c, DEFAULT_KLASS)
+        c.execute(q("UPDATE games SET klass=? WHERE klass IS NULL OR klass=''"), (DEFAULT_KLASS,))
+        rows = c.execute("SELECT name, ord FROM players ORDER BY ord").fetchall()
+        for r in rows:
+            _add_roster(c, DEFAULT_KLASS, r["name"], r["ord"])
+        print(f"  已遷移舊資料 → 班級「{DEFAULT_KLASS}」: {n_games} 場、{len(rows)} 位名單")
+    elif n_classes == 0 and n_games == 0:
+        # 全新空庫: 不建任何班, 等使用者自己新增。
+        pass
+
+def _ensure_class(c, name):
+    if PG:
+        c.execute("INSERT INTO classes(name, created, archived) VALUES(%s,%s,0) ON CONFLICT (name) DO NOTHING",
+                  (name, now()))
+    else:
+        c.execute("INSERT OR IGNORE INTO classes(name, created, archived) VALUES(?,?,0)", (name, now()))
+
+def _add_roster(c, klass, name, ordv):
+    if not (name or "").strip():
+        return
+    if PG:
+        c.execute("INSERT INTO roster(klass,name,ord) VALUES(%s,%s,%s) ON CONFLICT (klass,name) DO NOTHING",
+                  (klass, name, ordv))
+    else:
+        c.execute("INSERT OR IGNORE INTO roster(klass,name,ord) VALUES(?,?,?)", (klass, name, ordv))
 
 def seed_if_empty():
     c = conn()
@@ -148,13 +234,15 @@ def seed_if_empty():
         return
     data = json.load(open(SEED_JSON, encoding="utf-8"))
     roster = data.get("roster", [])
+    _ensure_class(c, DEFAULT_KLASS)
     for i, name in enumerate(roster):
-        ensure_player(c, name, i)
+        ensure_player(c, name, i)      # 保留全域 players(向後相容)
+        _add_roster(c, DEFAULT_KLASS, name, i)
     for sheet in data.get("sheets", []):
-        upsert_sheet(c, sheet, confirmed=0, autototal=True)
+        upsert_sheet(c, sheet, confirmed=0, autototal=True, klass=DEFAULT_KLASS)
     c.commit()
     c.close()
-    print(f"  已灌入種子: {len(data.get('sheets', []))} 場草稿、{len(roster)} 位名單")
+    print(f"  已灌入種子: {len(data.get('sheets', []))} 場草稿、{len(roster)} 位名單 → 班級「{DEFAULT_KLASS}」")
 
 def _i(v):
     """空字串/None -> None, 否則 int"""
@@ -166,18 +254,26 @@ def _i(v):
         return None
 
 def parse_sid_page(sid):
-    m = re.match(r"p(\d+)s(\d+)", sid or "")
+    # 容許班別前綴(如 "女籃3對3-u5-p1s2"), 用 search 從尾端抓 p<頁>s<張>。
+    m = re.search(r"p(\d+)s(\d+)", sid or "")
     if m:
         return int(m.group(1)), int(m.group(2))
     return None, None
 
-def upsert_sheet(c, s, confirmed=None, autototal=False):
+def upsert_sheet(c, s, confirmed=None, autototal=False, klass=None, source=None):
     """寫入一場草稿(metadata + stat_lines)。confirmed=None 表沿用既有值。
     autototal=True 時(辨識/種子)隊伍總得分若空白則自動帶入三人加總;
-    前端存檔(autototal=False)則完全照前端送來的值, 空白就存 NULL, 確保前後端一致。"""
+    前端存檔(autototal=False)則完全照前端送來的值, 空白就存 NULL, 確保前後端一致。
+    klass 有給就寫入班別(沿用既有時不要動到別的班)。"""
     sid = s["sid"]
+    if klass is None:
+        klass = s.get("klass")  # 也接受 sheet dict 內帶 klass
+    src = source if source is not None else s.get("source")   # 'ai' / 'manual'
     page, idx = parse_sid_page(sid)
-    row = c.execute(q("SELECT id, confirmed, img FROM games WHERE sid=?"), (sid,)).fetchone()
+    row = c.execute(q("SELECT id, confirmed, img, source FROM games WHERE sid=?"), (sid,)).fetchone()
+    # 鐵則: AI 辨識(source='ai')永不覆蓋助教手動登記的既有列。
+    if row and (row["source"] == "manual") and (src == "ai"):
+        return row["id"]
     img = s.get("img")
     if img is None and row:
         img = row["img"]  # 不要被前端覆寫掉圖片
@@ -236,6 +332,10 @@ def upsert_sheet(c, s, confirmed=None, autototal=False):
         if tb is None:
             tb = team_pts["B"]
     c.execute(q("UPDATE games SET total_a=?, total_b=? WHERE id=?"), (ta, tb, gid))
+    if klass:
+        c.execute(q("UPDATE games SET klass=? WHERE id=?"), (klass, gid))
+    if src:
+        c.execute(q("UPDATE games SET source=? WHERE id=?"), (src, gid))
     return gid
 
 def now():
@@ -267,19 +367,33 @@ def sheet_to_dict(g, lines):
         "refMain": g["ref_main"] or "", "refAsst": g["ref_asst"] or "", "refScorer": g["ref_scorer"] or "",
         "fmain": bool(g["fmain"]), "fasst": bool(g["fasst"]), "fscorer": bool(g["fscorer"]),
         "note": g["note"] or "", "done": bool(g["confirmed"]),
+        "source": g["source"] or "ai", "hasImg": bool(g["img"]),
     }
 
-def get_sheets():
+def get_sheets(klass=None, source=None):
+    """klass 有給就只回該班的場次; source 有給('ai'/'manual')再依來源過濾; 皆 None 回全部。"""
     with db() as c:
-        gs = c.execute("SELECT * FROM games ORDER BY page, idx_on_page, id").fetchall()
+        conds, params = [], []
+        if klass:
+            conds.append("klass=?"); params.append(klass)
+        if source:
+            conds.append("source=?"); params.append(source)
+        where = (" WHERE " + " AND ".join(conds)) if conds else ""
+        gs = c.execute(q("SELECT * FROM games" + where + " ORDER BY page, idx_on_page, id"),
+                       tuple(params)).fetchall()
         all_lines = c.execute("SELECT * FROM stat_lines ORDER BY game_id, col").fetchall()
     by_game = {}
     for ln in all_lines:
         by_game.setdefault(ln["game_id"], []).append(ln)
-    return [sheet_to_dict(g, by_game.get(g["id"], [])) for g in gs]
+    gids = {g["id"] for g in gs}
+    return [sheet_to_dict(g, by_game.get(g["id"], [])) for g in gs if g["id"] in gids]
 
-def get_roster():
+def get_roster(klass=None):
+    """klass 有給回該班名單(roster 表); None 時退回全域 players(向後相容)。"""
     with db() as c:
+        if klass:
+            return [row["name"] for row in
+                    c.execute(q("SELECT name FROM roster WHERE klass=? ORDER BY ord"), (klass,))]
         return [row["name"] for row in c.execute("SELECT name FROM players ORDER BY ord")]
 
 def get_img(sid):
@@ -300,11 +414,16 @@ def get_img(sid):
     etag = '"' + hashlib.md5(b64.encode("ascii", "ignore")).hexdigest()[:16] + '"'
     return mime, blob, etag
 
-def compute_summary():
-    """回傳 14 欄統計總表 (僅計 confirmed=1 的場次)。"""
+def compute_summary(klass=None):
+    """回傳 14 欄統計總表 (僅計 confirmed=1 的場次)。klass 有給就只計該班。"""
     with db() as c:
-        roster = [row["name"] for row in c.execute("SELECT name FROM players ORDER BY ord")]
-        games = c.execute("SELECT * FROM games WHERE confirmed=1").fetchall()
+        if klass:
+            roster = [row["name"] for row in
+                      c.execute(q("SELECT name FROM roster WHERE klass=? ORDER BY ord"), (klass,))]
+            games = c.execute(q("SELECT * FROM games WHERE confirmed=1 AND klass=?"), (klass,)).fetchall()
+        else:
+            roster = [row["name"] for row in c.execute("SELECT name FROM players ORDER BY ord")]
+            games = c.execute("SELECT * FROM games WHERE confirmed=1").fetchall()
         gids = {g["id"] for g in games}
         all_lines = c.execute("SELECT * FROM stat_lines").fetchall()
     order = {n: i for i, n in enumerate(roster)}
@@ -362,6 +481,134 @@ def compute_summary():
 SUMMARY_COLS = ["序號", "姓名", "完賽場數", "勝場次", "負場次", "總得分", "助攻", "抄截",
                 "防守籃板", "進攻籃板", "犯規", "擔任主裁判", "擔任副裁判", "擔任紀錄"]
 
+# ---------------------------------------------------------------- 班級 / 名單 / 收件匣 資料層
+def list_classes(include_archived=False):
+    """回每個班的概況: 名單人數、場次數、待辨識/待校對數。"""
+    with db() as c:
+        if include_archived:
+            cls = c.execute("SELECT * FROM classes ORDER BY archived, id").fetchall()
+        else:
+            cls = c.execute("SELECT * FROM classes WHERE archived=0 ORDER BY id").fetchall()
+        out = []
+        for k in cls:
+            nm = k["name"]
+            roster_n = c.execute(q("SELECT COUNT(*) AS n FROM roster WHERE klass=?"), (nm,)).fetchone()["n"]
+            games_n = c.execute(q("SELECT COUNT(*) AS n FROM games WHERE klass=?"), (nm,)).fetchone()["n"]
+            conf_n = c.execute(q("SELECT COUNT(*) AS n FROM games WHERE klass=? AND confirmed=1"), (nm,)).fetchone()["n"]
+            pend_up = c.execute(q("SELECT COUNT(*) AS n FROM uploads WHERE klass=? AND status='待辨識'"), (nm,)).fetchone()["n"]
+            out.append({
+                "id": k["id"], "name": nm, "archived": bool(k["archived"]),
+                "roster": roster_n, "games": games_n, "confirmed": conf_n,
+                "todo": games_n - conf_n, "pending_uploads": pend_up,
+            })
+    return out
+
+def create_class(name):
+    name = (name or "").strip()
+    if not name:
+        return False, "班級名稱不能空白"
+    with db() as c:
+        exists = c.execute(q("SELECT 1 FROM classes WHERE name=?"), (name,)).fetchone()
+        if exists:
+            return False, "已有同名班級"
+        _ensure_class(c, name)
+        c.commit()
+    return True, "已新增班級"
+
+def rename_class(old, new):
+    old, new = (old or "").strip(), (new or "").strip()
+    if not new:
+        return False, "新名稱不能空白"
+    with db() as c:
+        if not c.execute(q("SELECT 1 FROM classes WHERE name=?"), (old,)).fetchone():
+            return False, "找不到原班級"
+        if old != new and c.execute(q("SELECT 1 FROM classes WHERE name=?"), (new,)).fetchone():
+            return False, "新名稱已被其他班級使用"
+        # 班別是用「名字」當外鍵, 改名要連動 games / roster / uploads。
+        c.execute(q("UPDATE classes SET name=? WHERE name=?"), (new, old))
+        c.execute(q("UPDATE games   SET klass=? WHERE klass=?"), (new, old))
+        c.execute(q("UPDATE roster  SET klass=? WHERE klass=?"), (new, old))
+        c.execute(q("UPDATE uploads SET klass=? WHERE klass=?"), (new, old))
+        c.commit()
+    return True, "已改名"
+
+def archive_class(name, archived=True):
+    """封存/取消封存(隱藏但保留所有資料)。這是 UI「刪除」的安全預設。"""
+    with db() as c:
+        if not c.execute(q("SELECT 1 FROM classes WHERE name=?"), (name,)).fetchone():
+            return False, "找不到班級"
+        c.execute(q("UPDATE classes SET archived=? WHERE name=?"), (1 if archived else 0, name))
+        c.commit()
+    return True, ("已封存" if archived else "已取消封存")
+
+def set_roster(klass, names):
+    """整批覆寫某班名單(去空白、去重、保留順序)。"""
+    seen, clean = set(), []
+    for nm in names:
+        nm = (nm or "").strip()
+        if nm and nm not in seen:
+            seen.add(nm); clean.append(nm)
+    with db() as c:
+        _ensure_class(c, klass)
+        c.execute(q("DELETE FROM roster WHERE klass=?"), (klass,))
+        for i, nm in enumerate(clean):
+            _add_roster(c, klass, nm, i)
+            ensure_player(c, nm, i)   # 同步進全域 players, 讓既有彙整/下拉也認得
+        c.commit()
+    return len(clean)
+
+def add_upload(klass, filename, mime, data):
+    with db() as c:
+        ins = q("""INSERT INTO uploads(klass,filename,mime,data,status,uploaded_at)
+                   VALUES(?,?,?,?, '待辨識', ?)""")
+        params = (klass, filename, mime, data, now())
+        if PG:
+            uid = c.execute(ins + " RETURNING id", params).fetchone()["id"]
+        else:
+            uid = c.execute(ins, params).lastrowid
+        c.commit()
+    return uid
+
+def list_uploads(klass=None, status=None):
+    sql = "SELECT id, klass, filename, mime, status, uploaded_at FROM uploads"
+    where, params = [], []
+    if klass:
+        where.append("klass=?"); params.append(klass)
+    if status:
+        where.append("status=?"); params.append(status)
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += " ORDER BY id DESC"
+    with db() as c:
+        return [dict(r) for r in c.execute(q(sql), tuple(params))]
+
+def get_upload_file(uid):
+    with db() as c:
+        row = c.execute(q("SELECT filename, mime, data FROM uploads WHERE id=?"), (uid,)).fetchone()
+    if not row or row["data"] is None:
+        return None, None, None
+    return row["mime"] or "application/pdf", bytes(row["data"]), row["filename"]
+
+def delete_upload(uid):
+    with db() as c:
+        c.execute(q("DELETE FROM uploads WHERE id=?"), (uid,))
+        c.commit()
+    return True
+
+def delete_sheet(sid):
+    """刪一場(連同 stat_lines 級聯)。安全限制: 只允許刪 source='manual' 的場,
+       避免手動模式誤刪到 AI 卡片。"""
+    with db() as c:
+        row = c.execute(q("SELECT id, source FROM games WHERE sid=?"), (sid,)).fetchone()
+        if not row:
+            return False, "找不到此場"
+        if (row["source"] or "ai") != "manual":
+            return False, "只能刪除手動登記的場次"
+        c.execute(q("DELETE FROM stat_lines WHERE game_id=?"), (row["id"],))
+        c.execute(q("DELETE FROM games WHERE id=?"), (row["id"],))
+        c.commit()
+    return True, "已刪除"
+
 # ---------------------------------------------------------------- HTTP layer
 class H(BaseHTTPRequestHandler):
     def log_message(self, *a):
@@ -408,31 +655,64 @@ class H(BaseHTTPRequestHandler):
         with open(path, "rb") as f:
             self._send(200, f.read(), ctype)
 
+    def _qs(self):
+        """取 URL query 參數(單值)。"""
+        return {k: v[0] for k, v in parse_qs(urlparse(self.path).query).items()}
+
     def do_GET(self):
         if not self._authed():
             return
-        p = urlparse(self.path).path
-        if p in ("/", "/index.html"):
+        p = unquote(urlparse(self.path).path)   # 解碼中文路徑(/校對 /上傳 /使用教學)
+        qs = self._qs()
+        klass = qs.get("klass") or None
+        # ── 頁面 ──
+        if p in ("/", "/index.html", "/班級"):
+            return self._file("班級.html", "text/html; charset=utf-8")
+        if p in ("/校對", "/sheet", "/校對.html"):
             return self._file("校對.html", "text/html; charset=utf-8")
         if p in ("/summary", "/summary.html", "/總表"):
             return self._file("統計總表.html", "text/html; charset=utf-8")
+        if p in ("/upload", "/上傳", "/上傳.html"):
+            return self._file("上傳.html", "text/html; charset=utf-8")
+        if p in ("/手動登記", "/manual", "/手動登記.html"):
+            return self._file("手動登記.html", "text/html; charset=utf-8")
+        if p in ("/help", "/使用教學", "/使用教學.html"):
+            return self._file("使用教學.html", "text/html; charset=utf-8")
+        # ── API ──
+        if p == "/api/classes":
+            return self._send(200, list_classes(include_archived=bool(qs.get("all"))))
         if p == "/api/roster":
-            return self._send(200, get_roster())
+            return self._send(200, get_roster(klass))
         if p == "/api/sheets":
-            return self._send(200, {"roster": get_roster(), "sheets": get_sheets()})
+            return self._send(200, {"klass": klass, "roster": get_roster(klass),
+                                    "sheets": get_sheets(klass, qs.get("source"))})
         if p == "/api/summary":
-            return self._send(200, {"cols": SUMMARY_COLS, "rows": compute_summary()})
+            return self._send(200, {"klass": klass, "cols": SUMMARY_COLS, "rows": compute_summary(klass)})
         if p == "/api/summary.csv":
-            rows = compute_summary()
+            rows = compute_summary(klass)
             lines = [",".join(SUMMARY_COLS)]
             for r in rows:
                 lines.append(",".join(str(r[c]) for c in SUMMARY_COLS))
             csv = "﻿" + "\r\n".join(lines)
             return self._send(200, csv, "text/csv; charset=utf-8")
         if p == "/api/export":
-            return self._send(200, {"roster": get_roster(), "sheets": get_sheets()})
+            return self._send(200, {"klass": klass, "roster": get_roster(klass), "sheets": get_sheets(klass)})
+        if p == "/api/uploads":
+            return self._send(200, list_uploads(klass, qs.get("status")))
+        if p.startswith("/api/upload/") and p.endswith("/file"):
+            try:
+                uid = int(p[len("/api/upload/"):-len("/file")])
+            except ValueError:
+                return self._send(404, {"error": "bad id"})
+            mime, blob, fname = get_upload_file(uid)
+            if blob is None:
+                return self._send(404, {"error": "no file"})
+            return self._send(200, blob, mime, headers={
+                "Cache-Control": "private, max-age=3600",
+                "Content-Disposition": f'inline; filename="{uid}.pdf"',
+            })
         if p.startswith("/img/"):
-            sid = unquote(p[len("/img/"):])
+            sid = p[len("/img/"):]   # p 已整段 unquote, 不再重複解碼
             mime, blob, etag = get_img(sid)
             if blob is None:
                 return self._send(404, {"error": "no image"})
@@ -463,9 +743,54 @@ class H(BaseHTTPRequestHandler):
         if p in ("/api/save", "/api/confirm"):
             confirmed = 1 if p == "/api/confirm" else None
             with db() as c:
-                upsert_sheet(c, body, confirmed=confirmed)
+                upsert_sheet(c, body, confirmed=confirmed, klass=body.get("klass"), source=body.get("source"))
                 c.commit()
             return self._send(200, {"ok": True, "sid": body.get("sid"), "confirmed": bool(confirmed)})
+        # ── 班級管理 ──
+        if p == "/api/class/create":
+            ok, msg = create_class(body.get("name", ""))
+            return self._send(200 if ok else 400, {"ok": ok, "msg": msg})
+        if p == "/api/class/rename":
+            ok, msg = rename_class(body.get("old", ""), body.get("new", ""))
+            return self._send(200 if ok else 400, {"ok": ok, "msg": msg})
+        if p == "/api/class/archive":
+            ok, msg = archive_class(body.get("name", ""), bool(body.get("archived", True)))
+            return self._send(200 if ok else 400, {"ok": ok, "msg": msg})
+        # ── 名單 ──
+        if p == "/api/roster/set":
+            klass = (body.get("klass") or "").strip()
+            if not klass:
+                return self._send(400, {"ok": False, "msg": "缺少班級"})
+            names = body.get("names")
+            if names is None:  # 也接受整段文字(換行/逗號/空白分隔)
+                names = re.split(r"[\n,、\s]+", body.get("text", ""))
+            n = set_roster(klass, names)
+            return self._send(200, {"ok": True, "count": n})
+        # ── 收件匣 ──
+        if p == "/api/upload":
+            klass = (body.get("klass") or "").strip()
+            if not klass:
+                return self._send(400, {"ok": False, "msg": "缺少班級"})
+            raw_data = body.get("data", "")          # 接受 data-URI 或純 base64
+            m = re.match(r"data:([^;,]+)[^,]*,(.*)", raw_data, re.S)
+            if m:
+                mime, b64 = m.group(1), m.group(2)
+            else:
+                mime, b64 = body.get("mime", "application/pdf"), raw_data
+            try:
+                blob = base64.b64decode(b64)
+            except Exception:
+                return self._send(400, {"ok": False, "msg": "檔案解碼失敗"})
+            if not blob:
+                return self._send(400, {"ok": False, "msg": "空檔案"})
+            uid = add_upload(klass, body.get("filename", "upload.pdf"), mime, blob)
+            return self._send(200, {"ok": True, "id": uid})
+        if p == "/api/upload/delete":
+            delete_upload(int(body.get("id")))
+            return self._send(200, {"ok": True})
+        if p == "/api/sheet/delete":
+            ok, msg = delete_sheet(body.get("sid", ""))
+            return self._send(200 if ok else 400, {"ok": ok, "msg": msg})
         return self._send(404, {"error": "not found"})
 
 

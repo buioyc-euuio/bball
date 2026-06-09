@@ -85,12 +85,13 @@ table.msheet{border-collapse:collapse;width:100%;font-size:12px;table-layout:fix
   #host.d2open #d2{width:100vw}
 }
 </style></head><body>
-<header><h1>📊 統計總表</h1>
-<a href="/">← 回校對</a>
+<header><h1>📊 統計總表 <span id="klassName" style="font-size:13px;background:rgba(255,255,255,.22);padding:3px 10px;border-radius:20px"></span></h1>
+<a id="navHome" href="/">🏠 班級總覽</a>
+<a id="navSheet" href="/校對">📷 回校對</a>
 <span class="meta" id="meta"></span></header>
 <div class="wrap">
  <div class="bar">
-   <a class="btn" href="/api/summary.csv" download="籃球統計總表.csv">⬇️ 匯出 CSV(可用 Excel 開)</a>
+   <a class="btn" id="csvBtn" href="/api/summary.csv" download="籃球統計總表.csv">⬇️ 匯出 CSV(可用 Excel 開)</a>
    <button class="ghost" onclick="window.print()">🖨 列印 / 存 PDF</button>
    <label class="hint"><input type="checkbox" id="hideEmpty"> 只看有資料的人</label>
    <span class="hint" id="status"></span>
@@ -130,6 +131,12 @@ table.msheet{border-collapse:collapse;width:100%;font-size:12px;table-layout:fix
 </div>
 
 <script>
+// 班別: 從網址 ?klass= 取得; 統計與卡片都只看這個班。
+const KLASS=new URLSearchParams(location.search).get('klass')||'';
+const Q=KLASS?('?klass='+encodeURIComponent(KLASS)):'';
+if(KLASS){document.getElementById('klassName').textContent='｜'+KLASS;
+  document.getElementById('navSheet').href='/校對'+Q;
+  const cb=document.getElementById('csvBtn');cb.href='/api/summary.csv'+Q;}
 let COLS=[],ROWS=[],sortKey=null,sortDir=1;
 let SHEETS=[],BYNAME={};
 const NUMERIC=new Set(["序號","完賽場數","勝場次","負場次","總得分","助攻","抄截","防守籃板","進攻籃板","犯規","擔任主裁判","擔任副裁判","擔任紀錄"]);
@@ -140,8 +147,8 @@ function isEmptyRow(r){return COLS.every(c=>c==='序號'||c==='姓名'||!r[c]);}
 async function load(){
   try{
     const [sum,sh]=await Promise.all([
-      fetch('/api/summary').then(r=>r.json()),
-      fetch('/api/sheets').then(r=>r.json())
+      fetch('/api/summary'+Q).then(r=>r.json()),
+      fetch('/api/sheets'+Q).then(r=>r.json())
     ]);
     COLS=sum.cols;ROWS=sum.rows;
     SHEETS=sh.sheets||[];
@@ -198,12 +205,16 @@ function cardHTML(s,who){
   const refs=`主裁 <b>${esc(s.refMain||'—')}</b>‧副裁 <b>${esc(s.refAsst||'—')}</b>‧記錄 <b>${esc(s.refScorer||'—')}</b>`;
   const note=s.note?`<div class="gnote">📝 ${esc(s.note)}</div>`:'';
   const sidJs=s.sid.replace(/'/g,"\\'");
+  const srcTag=s.source==='manual'?'<span class="gbadge draft" style="background:#e7effd;color:#2563c9;border-color:#bcd3f5">手動</span>':'';
+  const imgBtn=s.hasImg
+    ? `<button class="imgbtn" onclick="openImg('${sidJs}','${esc('場次 '+noTxt+' ‧ 場地 '+(s.venue||'—')).replace(/'/g,"\\'")}')">🖼 查看原始圖檔</button>`
+    : '';
   return `<div class="gcard">
-    <div class="gchead"><span class="ttl">場次 ${noTxt}</span><span>場地 ${esc(s.venue||'—')}</span>${score}${badge}</div>
+    <div class="gchead"><span class="ttl">場次 ${noTxt}</span><span>場地 ${esc(s.venue||'—')}</span>${score}${badge}${srcTag}</div>
     <table class="msheet">${head}${body}</table>
     <div class="gmeta"><span>${refs}</span></div>
     ${note}
-    <button class="imgbtn" onclick="openImg('${sidJs}','${esc('場次 '+noTxt+' ‧ 場地 '+(s.venue||'—')).replace(/'/g,"\\'")}')">🖼 查看原始圖檔</button>
+    ${imgBtn}
   </div>`;
 }
 

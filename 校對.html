@@ -71,9 +71,11 @@ input,select{font-family:inherit;font-size:14px;padding:6px 7px;border:1px solid
 @media(max-width:1000px){.wrap{flex-direction:column}.col.left{flex:auto}.imgbox{position:static;max-height:none}}
 </style></head><body>
 <div id="loadOverlay"><div class="spin"></div><div class="txt">載入中…</div></div>
-<header><h1>📷 閃卡校對 ‧ 攻守紀錄辨識</h1>
+<header><h1>🃏 AI 閃卡模式 <span id="klassName" style="font-size:13px;background:rgba(255,255,255,.22);padding:3px 10px;border-radius:20px"></span></h1>
 <span class="save-dot" id="saveDot">連線中…</span>
-<a href="/summary">📊 統計總表</a>
+<a id="navHome" href="/">🏠 班級總覽</a>
+<a id="navManual" href="/手動登記">✍️ 傳統手動登記</a>
+<a id="navSummary" href="/summary">📊 統計總表</a>
 <span class="prog" id="prog"></span></header>
 <div class="wrap">
  <div class="col left"><div class="imgbox" id="imgbox" onclick="toggleZoom()">
@@ -118,7 +120,7 @@ input,select{font-family:inherit;font-size:14px;padding:6px 7px;border:1px solid
    <div class="card">
      <h2>資料保存</h2>
      <p style="font-size:12.5px;color:var(--muted);margin:0 0 10px">資料永遠住在本機資料庫 <b>bball.db</b>，與 HTML 完全脫鉤；按「儲存到後端」或「確認」即寫入，並會自動回讀後端比對是否一致。每次啟動服務也會自動備份到 <b>backups/</b> 資料夾。</p>
-     <button class="ghost" onclick="location.href='/api/export'">⬇️ 下載完整資料備份(JSON)</button>
+     <button class="ghost" onclick="location.href='/api/export'+Q">⬇️ 下載完整資料備份(JSON)</button>
      <span id="cnt" style="margin-left:10px;color:var(--muted);font-size:12.5px"></span>
    </div>
  </div>
@@ -126,6 +128,14 @@ input,select{font-family:inherit;font-size:14px;padding:6px 7px;border:1px solid
 <div class="flash" id="flash"></div>
 <datalist id="roster"></datalist>
 <script>
+// 班別: 從網址 ?klass= 取得; 所有 API 都帶上, 只校對這個班的場次。
+const KLASS=new URLSearchParams(location.search).get('klass')||'';
+const Q=KLASS?('?klass='+encodeURIComponent(KLASS)):'';
+// AI 閃卡模式只看 source=ai 的卡片(手動登記的不在這裡動)。
+const SHEETS_URL='/api/sheets'+Q+(KLASS?'&':'?')+'source=ai';
+if(KLASS){document.getElementById('klassName').textContent='｜'+KLASS;
+  document.getElementById('navSummary').href='/summary'+Q;
+  document.getElementById('navManual').href='/手動登記'+Q;}
 let ROSTER=[], DRAFTS=[], cur=0;
 const STAT_KEYS=['pts','foul','tfoul','ast','oreb','dreb','stl'];
 const ROWS=[['group','組別','text'],['name','姓名','name'],['pts','得分(正字筆數)','stat'],['foul','犯規','stat'],['tfoul','團犯','stat'],['ast','助攻','stat'],['oreb','進攻籃板','stat'],['dreb','防守籃板','stat'],['stl','抄截','stat']];
@@ -151,7 +161,7 @@ function updTeamConsistency(){
 function onTeamTotal(team,el){const v=el.value;DRAFTS[cur]['total'+team]=v===''?'':Number(v);updTeamConsistency();scheduleSave();}
 
 // ---- 後端同步 ----
-function payload(d){const o=JSON.parse(JSON.stringify(d));delete o.img;return o;}
+function payload(d){const o=JSON.parse(JSON.stringify(d));delete o.img;if(KLASS)o.klass=KLASS;return o;}
 function setSync(cls,msg){const e=document.getElementById('syncStatus');if(!e)return;e.className='sync '+cls;e.textContent=msg;}
 // 把一張資料整理成可比對的字串(只比有意義的欄位, 不含圖片/旗標)
 function canon(d){
@@ -166,7 +176,7 @@ function fillStats(list){list.forEach(d=>d.players.forEach(p=>{p.stats=p.stats||
 // 存檔後立刻回讀後端比對前後端是否一致
 async function verifySaved(d){
  try{
-   const j=await (await fetch('/api/sheets')).json();
+   const j=await (await fetch(SHEETS_URL)).json();
    const b=j.sheets.find(x=>x.sid===d.sid);
    if(!b){setSync('bad','⚠️ 後端找不到這張('+d.sid+')，請再按一次儲存');return false;}
    fillStats([b]);
@@ -183,7 +193,7 @@ async function reloadFromBackend(){
  if(!confirm('將以後端 bball.db 的內容覆蓋目前畫面，放棄此張尚未儲存的修改。確定？'))return;
  setSync('busy','從後端重新載入中…');
  const sid=DRAFTS[cur]&&DRAFTS[cur].sid;
- try{const j=await (await fetch('/api/sheets')).json();ROSTER=j.roster;DRAFTS=j.sheets;fillStats(DRAFTS);
+ try{const j=await (await fetch(SHEETS_URL)).json();ROSTER=j.roster;DRAFTS=j.sheets;fillStats(DRAFTS);
    const idx=DRAFTS.findIndex(x=>x.sid===sid);if(idx>=0)cur=idx;render();
    setSync('ok','↻ 已從後端重新載入（畫面 = 後端資料）');}
  catch(e){setSync('bad','⚠️ 無法連線後端');}
@@ -209,11 +219,20 @@ async function doSave(d){
 function hideOverlay(){document.getElementById('loadOverlay').classList.add('hide');}
 async function load(){
   try{
-    const r=await fetch('/api/sheets');const j=await r.json();
+    const r=await fetch(SHEETS_URL);const j=await r.json();
     ROSTER=j.roster; DRAFTS=j.sheets;
     document.getElementById('roster').innerHTML=ROSTER.map(n=>'<option value="'+esc(n)+'"></option>').join('');
     fillStats(DRAFTS);
     setDot('已連線 ✓');
+    if(!DRAFTS.length){
+      const mq='/手動登記'+Q;
+      document.querySelector('.wrap').innerHTML=
+        '<div class="card" style="margin:0 auto;max-width:560px;text-align:center;padding:30px">'
+        +'<h2>這個班還沒有 AI 閃卡</h2>'
+        +'<p style="color:var(--muted)">尚未對上傳的 PDF 跑過 AI 辨識。你可以改用<b>傳統手動登記</b>：左邊看 PDF、右邊空白表格自己鍵入。</p>'
+        +'<a class="btn" style="text-decoration:none;display:inline-block;margin-top:6px" href="'+mq+'">✍️ 改用傳統手動登記</a></div>';
+      return;
+    }
     render();
   }catch(e){setDot('⚠️ 無法連線到本地服務');document.body.insertAdjacentHTML('afterbegin','<div style="background:#ffe0dd;color:#a3271b;padding:14px;text-align:center">無法連到本地服務，請確認 server.py 正在執行(雙擊 start.command)。</div>');}
   finally{hideOverlay();}
